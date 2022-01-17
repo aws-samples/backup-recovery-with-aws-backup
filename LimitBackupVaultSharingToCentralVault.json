@@ -1,0 +1,23 @@
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BlockAllExceptCentralCopyVault",
+      "Effect": "Deny",
+      "Action": [
+        "backup:CopyFromBackupVault"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Condition": {
+        "ForAllValues:ArnNotLike": {
+          "backup:CopyTargets": [
+            "arn:aws:backup:<CentralRegion>:<CentralAccountId>:backup-vault:<CentralVault>"
+          ]
+        }
+      }
+    }
+  ]
+}

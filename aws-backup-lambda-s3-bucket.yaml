@@ -1,0 +1,115 @@
+---
+Description: S3 Bucket for Cross-Region, Cross-Account deployment of lambda functions and resources
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  AWSBackupBucketPrefix:
+    Description: Name of S3 bucket where codepipeline artifacts and solution deployment resources are stored
+    Type: String
+  OrganizationID:
+    Description: Provide read access to all accounts in the organization.  Leave blank for single account S3 bucket permissions.
+    Type: String
+    Default: ""
+Conditions:
+  OrgEnabledAccess: !Not [!Equals ["", !Ref OrganizationID]]
+
+Resources:
+  DeploymentBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Sub "${AWSBackupBucketPrefix}-${AWS::AccountId}-${AWS::Region}"
+#      BucketEncryption:
+#        ServerSideEncryptionConfiguration:
+#          - ServerSideEncryptionByDefault:
+#              SSEAlgorithm: aws:kms
+#              KMSMasterKeyID:
+#                Fn::ImportValue: <S3 CMK KMS Encryption Key>
+      VersioningConfiguration:
+        Status: Enabled
+      #      LoggingConfiguration:
+      #        DestinationBucketName:
+      #          Fn::ImportValue: !Sub <Destination Log Bucket>
+      #        LogFilePrefix: <Logfile Prefix>
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteRule
+            Status: Enabled
+            ExpirationInDays: '90'
+
+  DeploymentBucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref DeploymentBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Id: SSEAndSSLPolicy
+        Statement:
+          - Sid: DenyInsecureConnections
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !Join
+                - ''
+                - - Fn::GetAtt: [DeploymentBucket, Arn]
+                  - '/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyS3PublicObjectACL
+            Effect: Deny
+            Principal: "*"
+            Action: s3:PutObjectAcl
+            Resource:
+              - !Join
+                - ''
+                - - Fn::GetAtt: [DeploymentBucket, Arn]
+                  - '/*'
+            Condition:
+              StringEqualsIgnoreCaseIfExists:
+                s3:x-amz-acl:
+                  - public-read
+                  - public-read-write
+                  - authenticated-read
+          - !If
+            - OrgEnabledAccess
+            - Sid: ''
+              Effect: Allow
+              Principal: "*"
+              Action:
+                - s3:ListBucket
+              Resource: !GetAtt DeploymentBucket.Arn
+              Condition:
+                ForAnyValue:StringLike:
+                  aws:PrincipalOrgPaths:
+                    - !Sub "${OrganizationID}/*"
+            - !Ref 'AWS::NoValue'
+
+          - !If
+            - OrgEnabledAccess
+            - Sid: ''
+              Effect: Allow
+              Principal: "*"
+              Action:
+                - s3:Get*
+              Resource:
+                - !Join
+                  - ''
+                  - - Fn::GetAtt: [DeploymentBucket, Arn]
+                    - '/*'
+              Condition:
+                ForAnyValue:StringLike:
+                  aws:PrincipalOrgPaths:
+                    - !Sub "${OrganizationID}/*"
+            - !Ref 'AWS::NoValue'
+Outputs:
+  DeploymentBucketName:
+    Value: !Ref DeploymentBucket
+    Description: "S3 deployment bucket name for deployment support of packages and resources"
+    Export:
+      Name: "aws-backup-lambda-s3-bucket-name"
+
+  DeploymentBucketArn:
+    Value: !GetAtt DeploymentBucket.Arn
+    Description: "S3 deployment bucket ARN for deployment support of of packages and resources"
+    Export:
+      Name: "aws-backup-lambda-s3-bucket-arn"

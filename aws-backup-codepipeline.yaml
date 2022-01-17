@@ -1,0 +1,434 @@
+---
+Description: Backup & Recovery with AWS Backup CI/CD Automation Pipeline
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default:  Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default:  '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    ConstraintDescription: Must be a valid environment.
+    Default:  Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default:  someone@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default:  Backup and Recovery with AWS Backup
+
+Resources:
+  ProductPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: backup-recovery-aws-backup
+      ArtifactStore:
+        Type: S3
+        Location:
+          Fn::ImportValue: "aws-backup-s3-bucket-name"
+        EncryptionKey:
+          Id:
+            Fn::ImportValue:  "aws-backup-codepipeline-kms-id"
+          Type: 'KMS'
+      RoleArn:
+        Fn::GetAtt:
+          - CodePipelineManageStepsRole
+          - Arn
+      Stages:
+        - Name: SourceStageCodeCommit
+          Actions:
+            - InputArtifacts: []
+              Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: '1'
+                Provider: CodeCommit
+              Configuration:
+                RepositoryName:
+                  Fn::ImportValue: "aws-backup-codecommit-repo-name"
+                BranchName: main
+              OutputArtifacts:
+                - Name: SourceArtifacts
+        - Name: UpdateBackupRecoveryWithAWSBackupPipeline
+          Actions:
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Update_Pipeline
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName:  aws-backup-codepipeline
+                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: SourceArtifacts::aws-backup-codepipeline.yaml
+                TemplateConfiguration: SourceArtifacts::template-configurations/aws-backup-codepipeline.json
+              #                OutputFileName:
+              #                ParameterOverrides:
+              RunOrder: 1
+        - Name: TestBackupRecoveryWithAWSBackup
+          Actions:
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Static_Analysis
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: '1'
+                Provider: CodeBuild
+              Configuration:
+                ProjectName:  AWSBackup-ValidateTemplates
+              RunOrder: 1
+        - Name: DeployAWSBackupTargets
+          Actions:
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Deploy_Targets
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName:  aws-backup-ssm-targets
+                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: SourceArtifacts::aws-backup-ssm-targets.yaml
+                TemplateConfiguration: SourceArtifacts::template-configurations/aws-backup-ssm-targets.json
+              #                OutputFileName:
+              #                ParameterOverrides:
+              RunOrder: 1
+        - Name: DeployBackupRecoveryWithAWSBackupCode
+          Actions:
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Deploy_Templates
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: S3
+              Configuration:
+                BucketName:
+                  Fn::ImportValue: "aws-backup-s3-bucket-name"
+                Extract: true
+                ObjectKey: deployment
+                CannedACL: bucket-owner-full-control
+              RunOrder: 1
+        - Name: DeployLambdaS3Bucket
+          Actions:
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Deploy_Lambda_S3_Bucket
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: stackset-aws-backup-lambda-s3-bucket
+                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: SourceArtifacts::stackset-aws-backup-lambda-s3-bucket.yaml
+                TemplateConfiguration: SourceArtifacts::template-configurations/stackset-aws-backup-lambda-s3-bucket.json
+              RunOrder: 1
+        - Name: DeployLambdaFunctions
+          Actions:
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Deploy_BackupOrgPolicyManagerRole
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: aws-backup-backuporgpolicymanager-role
+                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: SourceArtifacts::Lambda/BackupOrgPolicyManager/aws-backup-backuporgpolicymanager-role.yaml
+                TemplateConfiguration: SourceArtifacts::template-configurations/aws-backup-backuporgpolicymanager-role.json
+              #                OutputFileName:
+              #                ParameterOverrides:
+              RunOrder: 1
+
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Test_Package_BackupOrgPolicyManager
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: '1'
+                Provider: CodeBuild
+              Configuration:
+                ProjectName:  AWSBackup-TestAndPackageBackupOrgPolicyManager
+              RunOrder: 2
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Deploy_BackupOrgPolicyManager
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: aws-backup-backuporgpolicymanager
+                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: SourceArtifacts::Lambda/BackupOrgPolicyManager/aws-backup-backuporgpolicymanager.yaml
+                TemplateConfiguration: SourceArtifacts::template-configurations/aws-backup-backuporgpolicymanager.json
+              #                OutputFileName:
+              #                ParameterOverrides:
+              RunOrder: 3
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Deploy_TagOnRestoreRole
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: stackset-aws-backup-tagonrestore-role
+                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: SourceArtifacts::stackset-aws-backup-tagonrestore-role.yaml
+                TemplateConfiguration: SourceArtifacts::template-configurations/stackset-aws-backup-tagonrestore-role.json
+              #                OutputFileName:
+              #                ParameterOverrides:
+              RunOrder: 1
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Test_Package_TagOnRestore
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: '1'
+                Provider: CodeBuild
+              Configuration:
+                ProjectName:  AWSBackup-TestAndPackageTagOnRestore
+              RunOrder: 2
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Deploy_TagOnRestore
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: stackset-aws-backup-tagonrestore
+                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: SourceArtifacts::stackset-aws-backup-tagonrestore.yaml
+                TemplateConfiguration: SourceArtifacts::template-configurations/stackset-aws-backup-tagonrestore.json
+              #                OutputFileName:
+              #                ParameterOverrides:
+              RunOrder: 3
+        - Name: DeployBackupRecoveryMemberAccounts
+          Actions:
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Deploy_MemberAccountsRole
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName:  stackset-aws-backup-member-accounts-role
+                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: SourceArtifacts::stackset-aws-backup-member-accounts-role.yaml
+                TemplateConfiguration: SourceArtifacts::template-configurations/stackset-aws-backup-member-accounts-role.json
+              #                OutputFileName:
+              #                ParameterOverrides:
+              RunOrder: 1
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Deploy_MemberAccounts
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName:  stackset-aws-backup-member-accounts
+                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: SourceArtifacts::stackset-aws-backup-member-accounts.yaml
+                TemplateConfiguration: SourceArtifacts::template-configurations/stackset-aws-backup-member-accounts.json
+              #                OutputFileName:
+              #                ParameterOverrides:
+              RunOrder: 2
+        - Name: DeployBackupOrgPolicy
+          Actions:
+            - InputArtifacts:
+                - Name: SourceArtifacts
+              Name: Deploy_BackupOrgPolicy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: REPLACE_ON_FAILURE
+                StackName:  aws-backup-org-policy
+                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: SourceArtifacts::aws-backup-org-policy.yaml
+                TemplateConfiguration: SourceArtifacts::template-configurations/aws-backup-org-policy.json
+              #                OutputFileName:
+              #                ParameterOverrides:
+              RunOrder: 1
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  CodePipelineManageStepsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: CodePipeline role for moving objects through the build and deploy stages.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: codepipeline.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelineManageS3Artifacts
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codecommit:GetBranch
+                  - codecommit:GetCommit
+                  - codecommit:UploadArchive
+                  - codecommit:GetUploadArchiveStatus
+                  - codecommit:CancelUploadArchive
+                Resource:
+                  Fn::ImportValue: "aws-backup-codecommit-arn"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:GetObjectVersion
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                Resource:
+                  - Fn::ImportValue: "aws-backup-s3-bucket-arn"
+                  - Fn::Sub:
+                      - "${bucketarn}/*"
+                      - bucketarn:
+                          Fn::ImportValue: "aws-backup-s3-bucket-arn"
+        - PolicyName: codepipeline-codecommit
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:StartBuild
+                  - codebuild:StopBuild
+                  - codebuild:BatchGetProjects
+                  - codebuild:BatchGetBuilds
+                  - codebuild:ListBuildsForProject
+                Resource:
+                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/AWSBackup-ValidateTemplates"
+                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/AWSBackup-TestAndPackageBackupOrgPolicyManager"
+                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/AWSBackup-TestAndPackageTagOnRestore"
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:UpdateStack
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:SetStackPolicy
+                  - cloudformation:ValidateTemplate
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - codebuild:ListBuilds
+                  - codebuild:ListProjects
+                  - codebuild:ListCuratedEnvironmentImages
+                  - codebuild:ListSourceCredentials
+                Resource: "*"
+              - Action:
+                  - 'kms:Encrypt'
+                  - 'kms:Decrypt'
+                  - 'kms:ReEncrypt*'
+                  - 'kms:GenerateDataKey*'
+                  - 'kms:DescribeKey'
+                Resource:
+                  Fn::ImportValue: "aws-backup-codepipeline-kms-arn"
+                Effect: Allow
+
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+

@@ -1,0 +1,18 @@
+{
+  "Parameters" : {
+    "StackSetName" : "organizations-aws-backup-member-accounts",
+    "StackSetS3BucketName" : "/backup/bucket",
+    "StackSetTargetOUsParameterStore" : "/backup/target/organizational-units",
+    "StackSetTargetRegionsParameterStore" : "/backup/target/regions",
+    "StackSetTemplate" : "deployment/aws-backup-member-account.yaml",
+    "StackSetDescription" : "StackSet for Backup and Recovery with AWS Backup Member Account Resources",
+    "CentralBackupVaultArn" : "/backup/central-vault-arn"
+  },
+  "Tags" : {
+    "BusinessUnit" : "Engineering",
+    "CostCenter" : "00000",
+    "Application" : "Example Application",
+    "ApplicationOwner" : "someone@example.com",
+    "Environment" : "Development"
+  }
+}

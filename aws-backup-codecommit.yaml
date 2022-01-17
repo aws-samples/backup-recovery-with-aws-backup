@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "The CodeCommit repo name for Backup & Recovery with AWS Backup"
+Parameters:
+  S3Key:
+    Description: S3 key for zip file of initial source
+    Type: String
+    Default:  aws-backup-solution.zip
+
+  # Customer Specific Tags - Example
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default:  Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default:  '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    ConstraintDescription: Must be a valid environment.
+    Default:  Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default:  someone@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default:  Backup and Recovery with AWS Backup
+
+Resources:
+  CodeCommitRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      Code:
+        S3:
+          Bucket:
+            Fn::ImportValue: "aws-backup-s3-bucket-name"
+          Key: !Ref S3Key
+      RepositoryDescription: "CodeCommit Repository For Backup & Recovery with AWS Backup Infrastructure As Code"
+      RepositoryName: backup-recovery-with-aws-backup
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+Outputs:
+  CodeCommitRepoARN:
+    Value: !GetAtt CodeCommitRepo.Arn
+    Description: "CodeCommit ARN for Backup & Recovery with AWS Backup"
+    Export:
+      Name: "aws-backup-codecommit-arn"
+
+  CodeCommitRepoName:
+    Value: !GetAtt CodeCommitRepo.Name
+    Description: "CodeCommit Repo Name for Backup & Recovery with AWS Backup"
+    Export:
+      Name: "aws-backup-codecommit-repo-name"
+
+
+  CodeCommitCloneUrlHttp:
+    Value: !GetAtt CodeCommitRepo.CloneUrlHttp
+    Description: "CodeCommit Clone URL HTTP for Backup & Recovery with AWS Backup"
+    Export:
+      Name: "aws-backup-codecommit-http-clone-url"

@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS Lambda Function role for BackupOrgPolicyManager Lambda Function.
+  It should be deployed in the same account as the BackupOrgPolicyManager Lambda Function.
+  This role depends on the BackupOrgPolicyManagerOrgAdmin role that is deployed into the AWS Organizations management account.
+
+Parameters:
+  OrganizationManagementAccount:
+    Description: The AWS Organizations management account where the BackupOrgPolicyManagerOrgAdmin role is deployed
+    Type: AWS::SSM::Parameter::Value<String>
+
+Resources:
+  BackupOrgPolicyManagerRole:
+    Type: 'AWS::IAM::Role'
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: IAM role should not allow * resource on its permissions policy
+          - id: F3
+            reason: IAM role should not allow * resource on its permissions policy
+    Properties:
+      RoleName:  BackupOrgPolicyManager
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: AssumeOrgRole
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource: !Sub "arn:aws:iam::${OrganizationManagementAccount}:role/BackupOrgPolicyManagerOrgAdmin"
+        - PolicyName: S3Permissions
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:Get*
+                Resource:
+                  - Fn::ImportValue: "aws-backup-s3-bucket-arn"
+                  - Fn::Sub:
+                      - "${bucketarn}/*"
+                      - bucketarn:
+                          Fn::ImportValue: "aws-backup-s3-bucket-arn"

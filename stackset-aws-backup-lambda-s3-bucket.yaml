@@ -1,0 +1,109 @@
+Description: "Self-managed StackSet for deploying an S3 bucket in each target region for deployment packages"
+Parameters:
+  StackSetName:
+    Description: Name of the stackset
+    Type: String
+  StackSetS3BucketName:
+    Description: Name of S3 bucket where stackset templates are stored.
+    Type: AWS::SSM::Parameter::Value<String>
+  StackSetTemplate:
+    Description: Name of S3 bucket where stackset templates are stored.
+    Type: String
+  StackSetDescription:
+    Description: Description for StackSet
+    Type: String
+    Default: "Self-managed StackSet for deploying an S3 bucket in each target region for deployment packages"
+  StackSetTargetRegionsParameterStore:
+    Description: Target regions
+    Type: AWS::SSM::Parameter::Value<CommaDelimitedList>
+  AWSBackupBucketPrefix:
+    Description: Name of S3 bucket bucket prefix for lambda function deployments
+    Type: AWS::SSM::Parameter::Value<String>
+  OrganizationID:
+    Description: Organization ID that should be provided access to S3 bucket
+    Type: String
+
+# Parameters for tagging
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default:  Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default:  '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    ConstraintDescription: Must be a valid environment.
+    Default:  Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default:  selfserviceservicecatalog@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default:  Example Application
+
+
+Resources:
+  StackSetDeployment:
+    Type: AWS::CloudFormation::StackSet
+    Properties:
+      StackSetName: !Ref StackSetName
+#      TemplateBody: String
+      TemplateURL: !Sub "https://s3.amazonaws.com/${StackSetS3BucketName}/${StackSetTemplate}"
+      Capabilities:
+        - CAPABILITY_NAMED_IAM
+      Description: !Ref StackSetDescription
+      OperationPreferences:
+        FailureToleranceCount: 0
+#        FailureTolerancePercentage: Integer
+        MaxConcurrentCount: 1
+#        MaxConcurrentPercentage: Integer
+        RegionConcurrencyType: SEQUENTIAL
+#        RegionOrder:
+#          - String
+      PermissionModel: SELF_MANAGED
+      StackInstancesGroup:
+        -
+          DeploymentTargets:
+            Accounts:
+              - !Ref AWS::AccountId
+#            OrganizationalUnitIds: !If ServiceManagedStackSet
+#              - !Ref StackSetTargetOUs
+#              - !Ref 'AWS::NoValue'
+#          ParameterOverrides:
+#            - Parameter
+          Regions: !Ref StackSetTargetRegionsParameterStore
+      Parameters:
+        - ParameterKey: AWSBackupBucketPrefix
+          ParameterValue: !Ref AWSBackupBucketPrefix
+        - ParameterKey: OrganizationID
+          ParameterValue: !Ref OrganizationID
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+

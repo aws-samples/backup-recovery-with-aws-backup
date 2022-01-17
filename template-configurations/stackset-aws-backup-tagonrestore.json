@@ -1,0 +1,20 @@
+{
+  "Parameters" : {
+    "StackSetName" : "organizations-aws-backup-tagonrestore",
+    "StackSetS3BucketName" : "/backup/bucket",
+    "StackSetTargetOUsParameterStore" : "/backup/target/organizational-units",
+    "StackSetTargetRegionsParameterStore" : "/backup/target/regions",
+    "StackSetTemplate" : "deployment/Lambda/TagOnRestore/aws-backup-tagonrestore.yaml",
+    "StackSetDescription" : "StackSet for Backup and Recovery with AWS Backup Tag Replicator",
+    "S3DeploymentBucketName": "/backup/lambda/bucket-prefix",
+    "HomeAccountParameterStore": "/backup/home-account",
+    "S3DeploymentPackage": "/backup/lambda/aws-backup-tagonrestore/deployed-package"
+  },
+  "Tags" : {
+    "BusinessUnit" : "Engineering",
+    "CostCenter" : "00000",
+    "Application" : "Example Application",
+    "ApplicationOwner" : "someone@example.com",
+    "Environment" : "Development"
+  }
+}

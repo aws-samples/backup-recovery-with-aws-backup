@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template deploys the lambda role assumed by the lambda function to  copy tags back to restored resources.
+  It should be deployed to each member account in the home region of the solution.
+Parameters:
+  AccountAWSBackupServiceRole:
+    Description: The AWS Backup Service Role, allows lambda function to pass this role
+    Type: String    
+    Default: AWSBackupSolutionRole
+
+Resources:
+  rTagOnRestoreAWSBackupRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: IAM role should not allow * resource on its permissions policy
+          - id: F3
+            reason: IAM role should not allow * resource on its permissions policy
+    Properties:
+      RoleName: TagOnRestoreFunctionForAWSBackup
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+          - arn:aws:iam::aws:policy/AWSBackupOperatorAccess
+      Policies:
+          - PolicyName: invokeLambda
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+              - Effect: Allow
+                Action:
+                - lambda:InvokeFunction
+                Resource: '*'           
+          - PolicyName: AllowUserToPassAWSBackupServiceRole
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Sid: AllowUserToPassAWSBackupServiceRole
+                  Effect: Allow
+                  Action: 'iam:PassRole'
+                  Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/${AccountAWSBackupServiceRole}"
+          - PolicyName: resourceTaggingRole
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ec2:DescribeTags
+                    - ec2:CreateTags
+                    - rds:ListTagsForResource
+                    - rds:AddTagsToResource
+                    - dynamodb:ListTagsOfResource
+                    - dynamodb:TagResource
+                    - elasticfilesystem:ListTagsForResource
+                    - elasticfilesystem:CreateTags
+                    - fsx:ListTagsForResource
+                    - fsx:TagResource             
+                    - storagegateway:ListTagsForResource
+                    - storagegateway:AddTagsToResource
+                  Resource: '*'
+          - PolicyName: logStreamPermissions
+            PolicyDocument:
+              Statement:                       
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'    
+Outputs:
+  oStackName:
+    Value: !Ref AWS::StackName    

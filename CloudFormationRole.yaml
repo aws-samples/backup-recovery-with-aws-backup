@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "Role used by CodePipeline for CloudFormation operations"
+Parameters:
+  # Customer Specific Tags - Example
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default:  Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default:  '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    ConstraintDescription: Must be a valid environment.
+    Default:  Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default:  someone@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default:  Backup and Recovery with AWS Backup
+
+
+Resources:
+  CloudFormationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudFormationRole
+      Description: Role assumed by CloudFormation for deploying resources, used by CodePipeline.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: cloudformation.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+        - arn:aws:iam::aws:policy/AWSOrganizationsReadOnlyAccess
+      Policies:
+        - PolicyName: CloudFormationPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:*
+                  - codepipeline:*
+                  - ssm:*
+                  - secretsmanager:GetSecretValue
+                  - lambda:*
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:GetObjectVersion
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                  - s3:DeleteObject
+                Resource:
+                  - Fn::ImportValue: "aws-backup-s3-bucket-arn"
+                  - Fn::Sub:
+                      - "${bucketarn}/*"
+                      - bucketarn:
+                          Fn::ImportValue: "aws-backup-s3-bucket-arn"
+              - Action:
+                  - 'kms:Encrypt'
+                  - 'kms:Decrypt'
+                  - 'kms:ReEncrypt*'
+                  - 'kms:GenerateDataKey*'
+                  - 'kms:DescribeKey'
+                Resource:
+                  Fn::ImportValue: "aws-backup-codepipeline-kms-arn"
+                Effect: Allow
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner

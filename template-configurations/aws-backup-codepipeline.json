@@ -1,0 +1,9 @@
+{
+  "Tags" : {
+    "BusinessUnit" : "Engineering",
+    "CostCenter" : "00000",
+    "Application" : "Backup & Recovery with AWS Backup",
+    "ApplicationOwner" : "someone@example.com",
+    "Environment" : "Development"
+  }
+}

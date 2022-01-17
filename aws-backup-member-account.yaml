@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  This template creates the regional KMS key used by AWS Backup and the AWS Backup Vault in each target account.
+  It should be deployed to each AWS Region of a member account where you intend to store backup data/vault.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: AWS Backup Local Configuration
+        Parameters:
+          - pMemberBackupVaultName
+          - pCrossAccountBackupRoleName
+          - pBackupKeyAlias
+
+      -
+        Label:
+          default: AWS Backup Central Copy Configuration
+        Parameters:
+          - CentralBackupVaultArn
+      -
+        Label:
+          default: AWS Backup Tags
+        Parameters:
+          - BusinessUnit
+          - CostCenter
+          - Owner
+
+    ParameterLabels:
+      CentralBackupVaultArn:
+        default: ARN for AWS Backup Central Vault
+      pCrossAccountBackupRoleName:
+        default: Enter an IAM service role name that will be used by AWS Backup
+      pBackupKeyAlias:
+        default: Name of the AWS Backup KMS key Alias
+      pMemberBackupVaultName:
+        default: Name of the AWS Backup vault (Case sensitive)
+      BusinessUnit:
+        default: Enter the business unit that owns the resources created by this stack.
+      CostCenter:
+        default: Enter the cost center for the resources created by this stack.
+      Owner:
+        default: Enter the owner for the resources created by this stack.
+
+Parameters:
+  CentralBackupVaultArn:
+    Description: The ARN of a centralized AWS Backup Vault that will be the secondary store for all AWS Backups.  The defined organization backup policy plans will "copy_to" this vault.
+    Type: String
+  pCrossAccountBackupRoleName:
+    Type: String
+    Description: This is the IAM role name for the cross-account backup role that carries out the backup activities.
+    Default:  AWSBackupSolutionRole
+  pBackupKeyAlias:
+    Type: String
+    Description: This is the name of the AWS Backup KMS key alias.
+    Default: AWSBackupSolutionKey
+  pMemberBackupVaultName:
+    Type: String
+    Description: This is the name of the member account backup vaults.
+    AllowedPattern: ^[a-zA-Z0-9\-\_\.]{1,50}$
+    ConstraintDescription: Backup vault name is case sensitive. Must contain from 2 to 50 alphanumeric and '-_' characters.
+    Default: AWSBackupSolutionVault
+  # Customer Specific Tags - Example
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default:  Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default:  '00000'
+  Owner:
+    Description: Email address of application owner
+    Type: String
+    Default:  backupandrecoveryowner@example.com
+Resources:
+  rMemberAccountBackupKey:
+    Type: AWS::KMS::Key
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: F76
+            reason: The principal is restricted by the condition statement
+    Properties:
+      Description: Symmetric AWS CMK for Member Account Backup Vault Encryption
+      EnableKeyRotation: True
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: !Sub ${pBackupKeyAlias}
+        Statement:
+          -
+            Sid: "Enable IAM User Permissions"
+            Effect: "Allow"
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: "kms:*"
+            Resource: "*"
+          -
+            Sid: Allow use of the key by authorized Backup principal
+            Effect: "Allow"
+            Principal:
+              AWS:
+                - !Sub  "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${pCrossAccountBackupRoleName}"
+            Action:
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey
+              - kms:GenerateDataKeyWithoutPlaintext
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "kms:CallerAccount": !Sub ${AWS::AccountId}
+                "kms:ViaService": !Sub "backup.${AWS::Region}.amazonaws.com"
+          -
+            Sid: Allow alias creation during setup
+            Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action: "kms:CreateAlias"
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "kms:CallerAccount": !Sub ${AWS::AccountId}
+                "kms:ViaService": !Sub "cloudformation.${AWS::Region}.amazonaws.com"        
+      Tags:
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Owner
+          Value: !Ref Owner
+  rMemberAccountBackupKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub alias/${pBackupKeyAlias}
+      TargetKeyId:
+        !Ref rMemberAccountBackupKey
+  rMemberAccountBackupVault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      BackupVaultName: !Ref pMemberBackupVaultName
+      EncryptionKeyArn: !GetAtt rMemberAccountBackupKey.Arn
+      AccessPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "Allow access to backup vault for copy operations to centralized backup vault"
+            Effect: Allow
+            Action: backup:CopyIntoBackupVault
+            Resource: !Ref CentralBackupVaultArn
+            Principal: "*"
+Outputs:
+  oMemberAccountBackupVault:
+    Value: !Ref rMemberAccountBackupVault
+  oMemberAccountKMSKey:
+    Value: !Ref rMemberAccountBackupKey
+  oOrgAccountBackupRole:
+    Value: !Sub  arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${pCrossAccountBackupRoleName}
+

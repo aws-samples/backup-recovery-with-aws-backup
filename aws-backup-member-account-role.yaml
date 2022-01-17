@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  This template creates the IAM service role used by AWS Backup.
+  It should be deployed to each AWS Organizations member account.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: AWS Backup Configuration
+        Parameters:
+          - pCrossAccountBackupRoleName
+    ParameterLabels:
+      pCrossAccountBackupRoleName:
+        default: Enter an IAM Role Name for the IAM backup role that will be used by AWS Backup
+      BusinessUnit:
+        default: Enter the business unit that owns the resources created by this stack.
+      CostCenter:
+        default: Enter the cost center for the resources created by this stack.
+      Owner:
+        default: Enter the owner for the resources created by this stack.
+Parameters:
+  pCrossAccountBackupRoleName:
+    Type: String
+    Description: This is the IAM role name for the cross-account backup role that carries out the backup activities.
+    Default:  AWSBackupSolutionRole
+  # Customer Specific Tags - Example
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default:  Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default:  '00000'
+  Owner:
+    Description: Email address of application owner
+    Type: String
+    Default:  backupandrecoveryowner@example.com
+Resources:
+  rOrgAccountBackupRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Ref pCrossAccountBackupRoleName
+      Description: Allows AWS Backup to access AWS services
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - backup.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores
+      Tags:
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Owner
+          Value: !Ref Owner
+Outputs:
+  oOrgAccountBackupRoleName:
+    Value: !Ref pCrossAccountBackupRoleName
+

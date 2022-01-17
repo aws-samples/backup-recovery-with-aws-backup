@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  "KMS Key for Backup & Recovery with AWS Backup Related Resources"
+Parameters:
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default:  Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default:  '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    ConstraintDescription: Must be a valid environment.
+    Default:  Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default:  someone@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default:  Backup and Recovery with AWS Backup
+
+
+Resources:
+  CodePipelineKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub "Built for Backup & Recovery with AWS Backup encrypt and decrypt pipeline artifacts and other data"
+      Enabled: true
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: "key-default-1"
+        Statement:
+          -
+            Sid: "Enable IAM User Permissions"
+            Effect: "Allow"
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: 'kms:*'
+            Resource: '*'
+#          -
+#            Sid: "Allow use of the key"
+#            Effect: "Allow"
+#            Principal:
+#              AWS:
+#              - !Ref TestAccount
+#            Action:
+#              - 'kms:Encrypt'
+#              - 'kms:Decrypt'
+#              - 'kms:ReEncrypt*'
+#              - 'kms:GenerateDataKey*'
+#              - 'kms:DescribeKey'
+#            Resource: '*'
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  CreateAMIKmsKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub "alias/aws-backup-codepipeline-kms"
+      TargetKeyId: !Ref CodePipelineKMSKey
+
+Outputs:
+  CreateAMIKmsKeyArn:
+    Value: !GetAtt [ 'CodePipelineKMSKey', 'Arn' ]
+    Description: "KMS Key Arn for Delivery Pipeline"
+    Export:
+      Name: "aws-backup-codepipeline-kms-arn"
+
+
+  CreateAMIKmsKeyID:
+    Value: !Ref CodePipelineKMSKey
+    Description: "KMS Key ID for Delivery Pipeline"
+    Export:
+      Name: !Sub "aws-backup-codepipeline-kms-id"

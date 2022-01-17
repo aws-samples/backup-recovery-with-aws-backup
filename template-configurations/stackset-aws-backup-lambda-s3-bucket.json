@@ -1,0 +1,18 @@
+{
+  "Parameters" : {
+    "StackSetName" : "account-aws-backup-lambda-s3-bucket",
+    "StackSetS3BucketName" : "/backup/bucket",
+    "StackSetTargetRegionsParameterStore" : "/backup/target/regions",
+    "StackSetTemplate" : "deployment/aws-backup-lambda-s3-bucket.yaml",
+    "StackSetDescription" : "StackSet for multi-region Lambda S3 deployment bucket",
+    "AWSBackupBucketPrefix": "/backup/lambda/bucket-prefix",
+    "OrganizationID": "o-8rs93jrymj"
+  },
+  "Tags" : {
+    "BusinessUnit" : "Engineering",
+    "CostCenter" : "00000",
+    "Application" : "Example Application",
+    "ApplicationOwner" : "someone@example.com",
+    "Environment" : "Development"
+  }
+}

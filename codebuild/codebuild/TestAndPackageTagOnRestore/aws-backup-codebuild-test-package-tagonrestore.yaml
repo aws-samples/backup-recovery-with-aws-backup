@@ -1,0 +1,125 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "The CodeBuild Project for testing and packaging lambda functions for deployment"
+Parameters:
+  # Customer Specific Tags - Example
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default:  Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default:  '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    ConstraintDescription: Must be a valid environment.
+    Default:  Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default:  someone@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default:  Example Application
+
+Resources:
+  CodeBuildValidateTemplate:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name:  AWSBackup-TestAndPackageTagOnRestore
+      Description: "Test and package code for AWS Lambda function"
+      ServiceRole: !GetAtt CodeBuildTestTemplatesExecutionRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      EncryptionKey:
+        Fn::ImportValue:  "aws-backup-codepipeline-kms-arn"
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: codebuild/TestAndPackageTagOnRestore/buildspec-testandpackage.yml
+      TimeoutInMinutes: 10
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  CodeBuildTestTemplatesExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName:   "TestTemplates-Policy"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - 'lambda:InvokeFunction'
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                  - 'ssm:PutParameter'
+                Effect: Allow
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/backup/*"
+              - Action:
+                  - 'cloudwatch:*'
+                  - 'logs:*'
+                  - 's3:*'
+                  - 'iam:*'
+                  - 'cloudformation:*'
+                  - 'ssm:GetParameters'
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                  - 'kms:Encrypt'
+                  - 'kms:Decrypt'
+                  - 'kms:ReEncrypt*'
+                  - 'kms:GenerateDataKey*'
+                  - 'kms:DescribeKey'
+                Resource:
+                  Fn::ImportValue: "aws-backup-codepipeline-kms-arn"
+                Effect: Allow
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+

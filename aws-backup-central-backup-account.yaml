@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  This template creates the regional KMS key used by AWS Backup and the AWS Backup Vault for the central backup account.
+  It should be deployed to an AWS Region in the central backup account where you intend to store copies of your backup data.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: AWS Backup Configuration
+        Parameters:
+          - pBackupKeyAlias
+          - pCentralBackupVaultName
+          - pOrganizationId
+      -
+        Label:
+          default: AWS Backup Tags
+        Parameters:
+          - BusinessUnit
+          - CostCenter
+          - Owner
+
+    ParameterLabels:
+      pBackupKeyAlias:
+        default: Backup KMS Key Alias Name
+      pCentralBackupVaultName:
+        default: Backup vault name (Case sensitive)
+      pOrganizationId:
+        default: Organization ID
+      BusinessUnit:
+        default: Enter the business unit that owns the resources created by this stack.
+      CostCenter:
+        default: Enter the cost center for the resources created by this stack.
+      Owner:
+        default: Enter the owner for the resources created by this stack.
+
+
+
+Parameters:
+  pBackupKeyAlias:
+    Type: String
+    Description: This is the name of the AWS Backup KMS key alias.
+    Default: AWSBackupSolutionCentralKey
+  pCentralBackupVaultName:
+    Type: String
+    Description: This is the name of the centralized account backup vault.
+    AllowedPattern: ^[a-zA-Z0-9\-\_\.]{1,50}$
+    ConstraintDescription: Backup vault name is case sensitive
+    Default:  AWSBackupSolutionCentralVault
+  pOrganizationId:
+    Type: String
+    Description: This is the AWS Organization ID value.
+    MinLength: 12
+    MaxLength: 12
+    AllowedPattern: '^o-[a-z0-9]{10,32}$'
+    ConstraintDescription: >
+      The Organization Id must be a 12 character string starting with o- and followed by 10 lower case
+      alphanumeric characters
+
+  # Customer Specific Tags - Example
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default:  Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default:  '00000'
+  Owner:
+    Description: Email address of application owner
+    Type: String
+    Default:  backupandrecoveryowner@example.com
+
+
+Resources:
+  rCentralAccountBackupKey:
+    Type: AWS::KMS::Key
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: F76
+            reason: The principal is restricted by the condition statement
+    Properties:
+      Description: "Backup Key"
+      EnableKeyRotation: True
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: !Sub ${pBackupKeyAlias}
+        Statement:
+          -
+            Sid: "Enable IAM User Permissions"
+            Effect: "Allow"
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+          
+          -
+            Sid: "Allow alias creation during setup"
+            Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action: "kms:CreateAlias"
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "kms:CallerAccount": !Sub ${AWS::AccountId}
+                "kms:ViaService": !Sub "cloudformation.${AWS::Region}.amazonaws.com"
+          
+          -
+            Sid: Allow use of the key by authorized Backup vault account
+            Effect: Allow
+            Principal: "*"
+            Action:
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey
+              - kms:GenerateDataKeyWithoutPlaintext
+            Resource: "*"
+            Condition:
+              ForAnyValue:StringLike:
+                aws:PrincipalOrgPaths: !Sub "${pOrganizationId}/*" # Isn't this exposing the key to all org principals?
+
+          - 
+            Sid: "Allow attachment of persistent resources"
+            Effect: Allow
+            Principal: "*"
+            Action:
+              - kms:CreateGrant
+              - kms:ListGrants
+              - kms:RevokeGrant
+            Resource: "*"
+            Condition:
+              Bool:
+                kms:GrantIsForAWSResource: true
+              ForAnyValue:StringLike:
+                aws:PrincipalOrgPaths: !Sub "${pOrganizationId}/*" # Same comment as above.
+      Tags:
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Owner
+          Value: !Ref Owner
+  rCentralAccountBackupKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub alias/${pBackupKeyAlias}
+      TargetKeyId:
+        !Ref rCentralAccountBackupKey
+  rCentralBackupVault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      BackupVaultName: !Ref pCentralBackupVaultName
+      EncryptionKeyArn: !GetAtt rCentralAccountBackupKey.Arn
+      AccessPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "Allow access to backup vault"
+            Effect: Allow
+            Action: backup:CopyIntoBackupVault
+            Resource: !Sub arn:${AWS::Partition}:backup:${AWS::Region}:${AWS::AccountId}:backup-vault:*
+            Principal: "*"
+            Condition:
+              StringEquals:
+                aws:PrincipalOrgID: !Ref pOrganizationId
+Outputs:
+  oCentralBackupVault:
+    Value: !Ref rCentralBackupVault
+    Export:
+      Name: "aws-backup-central-backup-vault-name"
+
+  CentralBackupVaultArn:
+    Value: !GetAtt rCentralBackupVault.BackupVaultArn
+    Export:
+      Name: "aws-backup-central-backup-vault-arn"

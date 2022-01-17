@@ -1,0 +1,36 @@
+version: 0.2
+
+env:
+  parameter-store:
+    deployed_hash: "/backup/lambda/aws-backup-tagonrestore/deployed-hash"
+    deployed_package: "/backup/lambda/aws-backup-tagonrestore/deployed-package"
+    lambda_s3_deployment_bucket_prefix: "/backup/lambda/bucket-prefix"
+    target_home_account: "/backup/home-account"
+    target_regions: "/backup/target/regions"
+
+phases:
+  pre_build:
+    commands:
+      - cd $CODEBUILD_SRC_DIR/Lambda/TagOnRestore/src
+      - export hash=$(find . -type f -exec md5sum {} \; | sort -k 2 | md5sum | cut -d' ' -f 1)
+      - echo "hash is $hash"
+      - deployment_package=aws-backup-tagonrestore_${hash}.zip
+      - target_regions="$(echo -e "${target_regions}" | tr -d '[:space:]')"
+  build:
+    commands:
+      - |
+        if [ "$hash" = "$deployed_hash" ]; then
+          echo "hash is the same, skipping update"
+          exit 0
+        else
+          echo "hash $hash is different, updating object version in parameter store with deployment object version: $version_id"
+          aws ssm put-parameter --name "/backup/lambda/aws-backup-tagonrestore/deployed-hash" --value $hash --region $AWS_DEFAULT_REGION --overwrite
+          aws ssm put-parameter --name "/backup/lambda/aws-backup-tagonrestore/deployed-package" --value ${deployment_package} --region $AWS_DEFAULT_REGION --overwrite
+
+          zip $CODEBUILD_SRC_DIR/${deployment_package} *
+          IFS=,
+          for region in $target_regions; do
+            echo "deploying ${deployment_package} to $region s3 bucket"
+            aws s3 cp $CODEBUILD_SRC_DIR/${deployment_package} s3://${lambda_s3_deployment_bucket_prefix}-${target_home_account}-${region}/lambda/${deployment_package}
+          done
+        fi

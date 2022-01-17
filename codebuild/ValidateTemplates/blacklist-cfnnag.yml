@@ -1,0 +1,10 @@
+---
+RulesToSuppress:
+- id: F3
+  reason: F3 temporary enable until analysis
+- id: F16
+  reason: F16 will be ignored for multi account access via orgs, conditions limit permissions to org
+- id: F38
+  reason: F38 will be ignored for multi account deployment
+- id: F76
+  reason: F76 will be ignored for multi account deployment - AMI Encryption key should be allowed for all accounts in org

@@ -1,0 +1,14 @@
+{
+  "Parameters" : {
+    "S3DeploymentPackage" : "/backup/lambda/aws-backup-backuporgpolicymanager/deployed-package",
+    "HomeAccountParameterStore": "/backup/home-account",
+    "S3DeploymentBucketName": "/backup/lambda/bucket-prefix"
+  },
+  "Tags" : {
+    "BusinessUnit" : "Engineering",
+    "CostCenter" : "00000",
+    "Application" : "Example Application",
+    "ApplicationOwner" : "someone@example.com",
+    "Environment" : "Development"
+  }
+}

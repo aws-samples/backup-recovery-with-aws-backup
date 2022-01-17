@@ -1,0 +1,114 @@
+Description: "StackSet for Backup and Recovery with AWS Backup Member Account Role"
+Parameters:
+# parameters for stackset
+  StackSetName:
+    Description: Name of the stackset
+    Type: String
+  StackSetS3BucketName:
+    Description: Name of S3 bucket where stackset templates are stored.
+    Type: AWS::SSM::Parameter::Value<String>
+  StackSetTemplate:
+    Description: Name of stackset template
+    Type: String
+  StackSetDescription:
+    Description: Description for StackSet
+    Type: String
+    Default:  Service Managed StackSet for Backup and Recovery with AWS Backup solution member account resources
+  StackSetTargetOUsParameterStore:
+    Description: Target organization unit ids
+    Type: AWS::SSM::Parameter::Value<CommaDelimitedList>
+  StackSetTargetRegionParameterStore:
+    Description: Target regions
+    Type: AWS::SSM::Parameter::Value<String>
+
+# Parameters for stack
+  pCrossAccountBackupRoleName:
+    Type: String
+    Description: This is the IAM role name for the cross-account backup role that carries out the backup activities.
+    Default:  AWSBackupSolutionRole
+
+# Parameters for tagging
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default:  Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default:  '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    ConstraintDescription: Must be a valid environment.
+    Default:  Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default:  selfserviceservicecatalog@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default:  Example Application
+
+
+Resources:
+  StackSetDeployment:
+    Type: AWS::CloudFormation::StackSet
+    Properties:
+      StackSetName: !Ref StackSetName
+#      TemplateBody: String
+      TemplateURL: !Sub "https://s3.amazonaws.com/${StackSetS3BucketName}/${StackSetTemplate}"
+      AutoDeployment:
+        Enabled: true
+        RetainStacksOnAccountRemoval: false
+      CallAs: DELEGATED_ADMIN
+      Capabilities:
+        - CAPABILITY_NAMED_IAM
+      Description: !Ref StackSetDescription
+      OperationPreferences:
+        FailureToleranceCount: 0
+#        FailureTolerancePercentage: Integer
+        MaxConcurrentCount: 1
+#        MaxConcurrentPercentage: Integer
+        RegionConcurrencyType: SEQUENTIAL
+#        RegionOrder:
+#          - String
+      PermissionModel: SERVICE_MANAGED
+      StackInstancesGroup:
+        -
+          DeploymentTargets:
+#            Accounts: !Ref StackSetTargetAccounts
+            OrganizationalUnitIds: !Ref StackSetTargetOUsParameterStore
+#          ParameterOverrides:
+#            - Parameter
+          Regions:
+            - !Ref StackSetTargetRegionParameterStore
+      Parameters:
+        -
+          ParameterKey: pCrossAccountBackupRoleName
+          ParameterValue: !Ref pCrossAccountBackupRoleName
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+

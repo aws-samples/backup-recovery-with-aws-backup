@@ -1,0 +1,12 @@
+{
+  "Parameters" : {
+    "OrganizationManagementAccount": "/backup/org-management-account"
+  },
+  "Tags" : {
+    "BusinessUnit" : "Engineering",
+    "CostCenter" : "00000",
+    "Application" : "Backup and Recovery with AWS Backup",
+    "ApplicationOwner" : "someone@example.com",
+    "Environment" : "Development"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "Parameters" : {
+    "StackSetName" : "organizations-aws-backup-member-accounts-role",
+    "StackSetS3BucketName" : "/backup/bucket",
+    "StackSetTargetOUsParameterStore" : "/backup/target/organizational-units",
+    "StackSetTargetRegionParameterStore" : "/backup/target/global-region",
+    "StackSetTemplate" : "deployment/aws-backup-member-account-role.yaml",
+    "StackSetDescription" : "StackSet for Backup and Recovery with AWS Backup Member Account Resources",
+
+    "pCrossAccountBackupRoleName" : "AWSBackupSolutionRole"
+  },
+  "Tags" : {
+    "BusinessUnit" : "Engineering",
+    "CostCenter" : "00000",
+    "Application" : "Example Application",
+    "ApplicationOwner" : "someone@example.com",
+    "Environment" : "Development"
+  }
+}
