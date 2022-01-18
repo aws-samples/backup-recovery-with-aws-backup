@@ -20,9 +20,7 @@ You should deploy and modify this solution to meet your needs in a non-productio
 ## Solution architecture and design
 The following diagram illustrates the AWS Backup automation solution discussed in this blog and repository:
 
-<img src="./Images/Backup_Recovery_AWS_Backup_Baseline_Architecture.png" width="3000" height="400"/>
-
-### Solution Components
+<img src="./Images/Backup_Recovery_AWS_Backup_Baseline_Architecture.png" width="3000" height="350"/>
 
 #### AWS Organizations Management Account
 * Backup Policy Management Role (**BackupOrgPolicyManagerOrgAdmin**):
