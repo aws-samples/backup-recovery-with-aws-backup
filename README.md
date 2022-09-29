@@ -90,13 +90,15 @@ Take the following steps to enable delegated administrator permissions for your 
 
 * Register the solution home account as a delegated administrator: 
 
-      aws organizations register-delegated-administrator --account-id=\<Solution Home AWS Account Number> --service-principal=member.org.stacksets.cloudformation.amazonaws.com 
+      aws organizations register-delegated-administrator --account-id=<Solution Home AWS Account Number> --service-principal=member.org.stacksets.cloudformation.amazonaws.com 
 
 * Verify that the registration succeeded:
 
       aws organizations list-delegated-administrators
 
 # Deployment
+Follow the instructions below, confirming that each created CloudFormation stack is in the **CREATE_COMPLETE** state 
+before proceeding with the next step.
 
 ## Central Account Backup Configuration
 You must choose a single account that you wish to be the secondary store for backup copies for your AWS Organization.  This account will receive a copy of each backup performed in the organization for the organization units you have specified.  You should choose an account where permissions have been limited appropriately to administrative users.
@@ -329,6 +331,8 @@ The BackupOrgPolicyManager AWS Lambda Function assumes the **BackupOrgPolicyMana
 
 You must deploy the role, BackupOrgPolicyManagerOrgAdmin into your AWS Organizations Management account so that the solution home account can assume this role to manage your AWS organizations backup policies.
 
+You should review the backup policy configuration using the guidance in the next section before you retry / re-run the **backup-recovery-aws-backup** CodePipeline in the solution management account to deploy your backup configuration.
+
 You deploy this role to a region of your choice in the AWS Organizations management account using the following command:
 
       aws cloudformation create-stack \
@@ -339,13 +343,12 @@ You deploy this role to a region of your choice in the AWS Organizations managem
           --capabilities CAPABILITY_NAMED_IAM \
           --region <run this command in one region of your choice>
 
-You should review the backup policy configuration using the guidance in the next section before you retry / re-run the the **backup-recovery-aws-backup** CodePipeline in the solution management account to deploy your backup configuration. 
 
 # AWS Organizations Backup Policy Management with CloudFormation Custom Resource - BackupOrgPolicyManager
 
 You can manage your AWS Organizations backup policies with the BackupOrgPolicyManager AWS CloudFormation custom resource.  
 
-An example is provided and integrated with AWS CodePipeline in the [aws-backup-org-policy stack](./aws-backup-org-policy.yaml).  
+An example is provided and integrated with your deployed AWS CodePipeline in the [aws-backup-org-policy stack](./aws-backup-org-policy.yaml).  
 
 This example implements the following policy properties:
 

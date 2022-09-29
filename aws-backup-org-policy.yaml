@@ -60,7 +60,6 @@ Parameters:
     Default: 'aws-backup'
 
 # TODO:  Update so that backup policy is defined as YAML
-# TODO:  Verify that the PolicyTargets works for OUs as well as account ids, member org accounts.
 
 Resources:
   rOrgDailyBackUpPolicy:
