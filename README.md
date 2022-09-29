@@ -265,7 +265,7 @@ You deploy this CodeBuild project using a CloudFormation stack in the home regio
 
 ### Update SSM Targets configuration file
 
-Update the values for the following JSON keys in the [aws-backup-ssm-targets.json](/template-configurations/aws-backup-ssm-targets.json) file:
+Update the values for the following JSON keys in the [aws-backup-ssm-targets.json](template-configurations/aws-backup-ssm-targets.json) file:
 
 * "**TargetHomeAccount**" : Enter the AWS Account number for the management solution home. (e.g. "123456789012")
 * "**TargetRegions**" : Enter the AWS regions that you will backup using the solution as a comma separated list (e.g. "us-east-1, us-east-2") 
