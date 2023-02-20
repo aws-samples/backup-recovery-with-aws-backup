@@ -1,5 +1,5 @@
 #!/bin/bash
-
+echo "[!] Building codebuild locally"
 function allOSRealPath() {
     if isOSWindows
     then
