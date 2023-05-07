@@ -1,49 +1,16 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: "Role used by CodePipeline for CloudFormation operations"
+Description: "Role used by CloudFormation granting permissions to manage AWS resources"
 Parameters:
-  # Customer Specific Tags - Example
-  BusinessUnit:
-    Description: Business Unit Name
+  OrganizationManagementAccountId:
+    Description: Enter the AWS Organizations Management Account ID.  This is used to provide CloudFormation with permissions required for AWS Backup policy management.
     Type: String
-    MinLength: '1'
-    MaxLength: '255'
-    AllowedValues:
-      - Marketing
-      - Engineering
-      - R&D
-    ConstraintDescription: Must be a valid business unit
-    Default:  Engineering
-  CostCenter:
-    Description: Cost Center for AWS Services
-    Type: String
-    MinLength: '1'
-    MaxLength: '255'
-    Default:  '00000'
-  Environment:
-    Description: Environment
-    Type: String
-    AllowedValues:
-      - Development
-      - QA
-      - Production
-    ConstraintDescription: Must be a valid environment.
-    Default:  Development
-  ApplicationOwner:
-    Description: Email address of application owner
-    Type: String
-    Default:  someone@example.com
-  Application:
-    Description: Application Name
-    Type: String
-    Default:  Backup and Recovery with AWS Backup
-
-
+    
 Resources:
   CloudFormationRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: CloudFormationRole
-      Description: Role assumed by CloudFormation for deploying resources, used by CodePipeline.
+      Description: Role assumed by CloudFormation for deploying resources
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -53,7 +20,6 @@ Resources:
           Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
-        - arn:aws:iam::aws:policy/AWSOrganizationsReadOnlyAccess
       Policies:
         - PolicyName: CloudFormationPermissions
           PolicyDocument:
@@ -67,10 +33,44 @@ Resources:
                   - secretsmanager:GetSecretValue
                   - lambda:*
                 Resource: "*"
-              - Effect: Allow
+              - Sid: AllowOrganizationsRead
+                Effect: Allow
                 Action:
-                  - organizations:ListDelegatedAdministrators
+                  - organizations:Describe*
+                  - organizations:List*
                 Resource: "*"
+              - Sid: AllowBackupPoliciesCreation
+                Effect: Allow
+                Action:
+                  - organizations:CreatePolicy
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    organizations:PolicyType: BACKUP_POLICY
+              - Sid: AllowBackupPoliciesModification
+                Effect: Allow
+                Action:
+                  - organizations:DescribePolicy
+                  - organizations:UpdatePolicy
+                  - organizations:DeletePolicy
+                Resource:
+                  - !Sub "arn:aws:organizations::${OrganizationManagementAccountId}:policy/*/backup_policy/*"
+                Condition:
+                  StringEquals:
+                    organizations:PolicyType: BACKUP_POLICY
+              - Sid: AllowBackupPoliciesAttachmentAndDetachmentToAllAccountsAndOUs
+                Effect: Allow
+                Action:
+                  - organizations:AttachPolicy
+                  - organizations:DetachPolicy
+                Resource:
+                  - !Sub "arn:aws:organizations::${OrganizationManagementAccountId}:root/*"
+                  - !Sub "arn:aws:organizations::${OrganizationManagementAccountId}:ou/*"
+                  - !Sub "arn:aws:organizations::${OrganizationManagementAccountId}:account/*"
+                  - !Sub "arn:aws:organizations::${OrganizationManagementAccountId}:policy/*/backup_policy/*"
+                Condition:
+                  StringEquals:
+                    organizations:PolicyType: BACKUP_POLICY
               - Effect: Allow
                 Action:
                   - s3:GetObject
@@ -96,14 +96,3 @@ Resources:
                 Resource:
                   Fn::ImportValue: "aws-backup-codepipeline-kms-arn"
                 Effect: Allow
-      Tags:
-        - Key: Application
-          Value: !Ref Application
-        - Key: BusinessUnit
-          Value: !Ref BusinessUnit
-        - Key: CostCenter
-          Value: !Ref CostCenter
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ApplicationOwner
-          Value: !Ref ApplicationOwner

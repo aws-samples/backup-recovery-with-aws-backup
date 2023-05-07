@@ -41,15 +41,12 @@ The following diagram illustrates the AWS Backup automation solution discussed i
 * AWS Organizations Backup Policy Manager Lambda Function (**BackupOrgPolicyManager**)
 * Systems Manager Parameter Store Parameters: 
   * **/backup/bucket**:
-  * **/backup/org-management-account**:
   * **/backup/home-account**:
   * **/backup/central-vault-arn**
   * **/backup/target/global-region**
   * **/backup/target/regions**
   * **/backup/target/organizational-units**  
   * **/backup/lambda/bucket-prefix**
-  * **/backup/lambda/aws-backup-backuporgpolicymanager/deployed-package**
-  * **/backup/lambda/aws-backup-backuporgpolicymanager/deployed-hash**
   * **/backup/lambda/aws-backup-tagonrestore/deployed-package**
   * **/backup/lambda/aws-backup-tagonrestore/deployed-hash**
 
@@ -102,8 +99,23 @@ Take the following steps to enable delegated administrator permissions for your 
 Follow the instructions below, confirming that each created CloudFormation stack is in the **CREATE_COMPLETE** state 
 before proceeding with the next step.
 
-## Central Account Backup Configuration
-You must choose a single account that you wish to be the secondary store for backup copies for your AWS Organization.  This account will receive a copy of each backup performed in the organization for the organization units you have specified.  You should choose an account where permissions have been limited appropriately to administrative users.
+## Grant AWS Organizations Delegated Administrator permissions for AWS Backup Policies to the solution account
+Before you can manage and update AWS Organizations backup policies from another AWS account, you need to grant that account permissions via a [resource-based delegation policy](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_delegate_policies.html) in your AWS Organizations management account.  
+
+The [aws-backup-org-resource-policy-delegate-backup-policy-mgmt.yaml](aws-backup-org-resource-policy-delegate-backup-policy-mgmt.yaml) CloudFormation template has been provided to deploy a resource-based delegation policy that grants the AWS account you have chosen for the solution to manage AWS Backup policies for the AWS organization.
+
+Run this command to deploy the policy in your AWS Organizations Management account.  Make sure your permissions are set to your AWS Organizations management account:
+
+      aws cloudformation create-stack \
+          --stack-name "aws-backup-org-resource-policy-delegate-backup-policy-mgmt"  \
+          --template-body "file://aws-backup-org-resource-policy-delegate-backup-policy-mgmt.yaml" \
+          --parameters ParameterKey=SolutionHomeAccountId,ParameterValue=<The AWS Account Id where you are deploying the solution> \
+          --tags "Key"="Application","Value"="Backup and Recovery with AWS Backup Solution" \
+          --region <run this command in one region of your choice>
+
+
+## Central Backup Account Backup Configuration
+You must choose a single account that you wish to be the secondary store for backup copies for your AWS Organization.  This account will receive a copy of each backup performed in the organization for the organization units you have specified in the solution.  You should choose an account where permissions have been limited appropriately to administrative users.
 
 The central account configuration is completed by:
 
@@ -153,10 +165,10 @@ You can retrieve the ARN using this command:
 
 You need to select a AWS home account and AWS home region where the solution will be deployed.  This includes the CodeCommit repository, CodePipeline,  and related AWS resources to support deployment and management.
 
-CodePipeline will orchestrate deployment and management of the solution components to the AWS Accounts in your AWS Organization that you want to backup.
+CodePipeline will orchestrate deployment and management of the solution components to all the AWS Organization Member accounts specified in your AWS Backup policies (i.e. KMS Key, Backup Vault, AWS Backup Service Role)
 
 
-### Enable Self-Managed StackSet Administration
+### 1. Enable Self-Managed StackSet Administration
 
 You need to grant [self-managed stackset permissions](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-prereqs-self-managed.html) so that the management account can use stacksets to deploy / manage solution components across multiple regions within the account.
 
@@ -180,11 +192,11 @@ If you haven't already done this in the account where the solution is deployed, 
 
 Make sure you enter the solution home AWS account id for the **AdministratorAccountId** parameter value.
 
-### Deploy S3 Bucket
+### 2. Deploy S3 Bucket
 
 An S3 bucket is used by CodeCommit to create the initial CodeCommit repository as well as by CodePipeline as the Artifact store.
 
-You deploy this S3 bucket using a CloudFormation stack in the home region and account using the following command:
+You deploy this S3 bucket using a CloudFormation stack in the solution home account and solution home region using the following command:
 
         aws cloudformation create-stack \
         --stack-name "aws-backup-s3-bucket"  \
@@ -194,10 +206,10 @@ You deploy this S3 bucket using a CloudFormation stack in the home region and ac
         --region <run this command in the home region of your choice>
 
 
-### Deploy KMS Key
+### 3. Deploy KMS Key
 A KMS key is used to encrypt CodePipeline artifacts.
 
-Deploy the KMS key in the home account and region that you have selected for the solution.
+Deploy the KMS key in the solution home account and region that you have selected.
 
       aws cloudformation create-stack \
           --stack-name "aws-backup-codepipeline-kms-key"  \
@@ -207,25 +219,26 @@ Deploy the KMS key in the home account and region that you have selected for the
           --region <run this command in the home region of your choice>
 
 
-### Deploy CloudFormation service role used by CodePipeline
+### 4. Deploy CloudFormation service role used by CodePipeline
 
-A separate IAM service role is used by CodePipeline in the solution for CloudFormation related stack / stackset operations.  This role needs to be deployed in the home account for the solution.  
+A separate IAM service role is used by CodePipeline in the solution for CloudFormation related stack / stackset operations.  This role needs to be deployed in the solution home account.  
 
       aws cloudformation create-stack \
           --stack-name "aws-backup-codepipeline-cloudformation-role"  \
           --template-body "file://CloudFormationRole.yaml" \
+          --parameters ParameterKey=OrganizationManagementAccountId,ParameterValue=<The AWS Account Id for the AWS Organizations Management account> \
           --tags "Key"="Application","Value"="Backup and Recovery with AWS Backup Solution" \
           --capabilities CAPABILITY_NAMED_IAM \
           --region <run this command in the home region of your choice>
 
 
-### Deploy CodeBuild Projects
+### 5. Deploy CodeBuild Projects
 
 CodeBuild projects are used by CodePipeline for static analysis and packaging and testing the AWS Lambda functions used by the solution.  
 
 Deploy the CodeBuild projects in the home account and region that you have selected for the solution.
 
-#### 1.  Deploy CodeBuild Project AWSBackup-ValidateTemplate
+#### A. Deploy CodeBuild Project AWSBackup-ValidateTemplate
 
 This CodeBuild project performs static analysis on the CloudFormation templates used in the solution using cfn-nag.
 
@@ -239,7 +252,7 @@ You deploy this CodeBuild project using a CloudFormation stack in the home regio
         --region <run this command in the home region of your choice>
 
 
-#### 2.  Deploy CodeBuild Project AWSBackup-TestAndPackageTagOnRestore
+#### B. Deploy CodeBuild Project AWSBackup-TestAndPackageTagOnRestore
 
 This CodeBuild project packages and tests the TagOnRestore AWS Lambda function code for subsequent deployment as a CloudFormation StackSet by CodePipeline.
 
@@ -253,21 +266,7 @@ You deploy this CodeBuild project using a CloudFormation stack in the home regio
         --region <run this command in the home region of your choice>
 
 
-#### 3.  Deploy CodeBuild Project AWSBackup-TestAndPackageBackupOrgPolicyManager
-
-This CodeBuild project packages and tests the BackupOrgPolicyManager AWS Lambda function code for subsequent deployment as a CloudFormation Stack by CodePipeline.
-
-You deploy this CodeBuild project using a CloudFormation stack in the home region and account using the following command:
-
-        aws cloudformation create-stack \
-        --stack-name "aws-backup-codebuild-test-package-orgpolicymanager"  \
-        --template-body "file://codebuild/TestAndPackageBackupOrgPolicyManager/aws-backup-codebuild-test-package-orgpolicymanager.yaml" \
-        --tags "Key"="Application","Value"="Backup and Recovery with AWS Backup Solution" \
-        --capabilities CAPABILITY_NAMED_IAM \
-        --region <run this command in the home region of your choice>
-
-
-### Update SSM Targets configuration file
+### 6. Update SSM Targets configuration file [aws-backup-ssm-targets.json](template-configurations/aws-backup-ssm-targets.json)
 
 Update the values for the following JSON keys in the [aws-backup-ssm-targets.json](template-configurations/aws-backup-ssm-targets.json) file:
 
@@ -278,8 +277,25 @@ Update the values for the following JSON keys in the [aws-backup-ssm-targets.jso
 * "**CentralBackupVaultArn**": Enter the ARN for the Central Backup Vault where secondary copies of your backups will be stored (e.g. arn:aws:backup:us-east-1:123456789012:backup-vault:AWSBackupSolutionCentralVault)
 * "**OrgManagementAccount**": Enter the AWS account number for your AWS Organizations management account (e.g. "123456789012")
 
+This parameter in this file are used by CodePipeline to deploy the [aws-backup-ssm-targets.yaml](aws-backup-ssm-targets.yaml) CloudFormation template.
 
-### Deploy CodeCommit Repository
+### 7.  Update the [aws-backup-org-policy.yaml](aws-backup-org-policy.yaml) CloudFormation template
+
+The [aws-backup-org-policy.yaml](aws-backup-org-policy.yaml) CloudFormation template is used to manage your AWS Organizations Backup policies.  The template uses the [AWS::Organizations::Policy](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-organizations-policy.html) to manage Backup policies for the AWS Organization as a delegated administrator via CloudFormation.
+
+Ensure that you have given your solution home account delegated administrator permissions as described in the first step of this deployment section.
+
+The provided template uses the [Fn::ToJsonString](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-ToJsonString.html) CloudFormation transformation, allowing you to manage your [Backup Policies](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_backup_syntax.html#backup-policy-syntax-reference) in YAML syntax within CloudFormation.
+
+This example implements the following policy properties:
+
+* For all supported resources in the target regions and target OUs that are tagged with the tag key **backup** and the tag value **daily**, perform a nightly backup at 05:00 UTC.  The backup will have a retention period of 35 days.  The backups will also be copied to the selected central backup vault.  If the backup doesn't complete in 1200 (20 hours) then it will be cancelled.
+* For all supported resources in the target regions and target OUs that are tagged with the tag key **backup** and the tag value **monthly**, perform a monthly backup at 05:00 UTC on the first day of each month.  The backup will have a retention period of 366 days.  The backups will also be copied to the selected central backup vault.  If the backup doesn't complete in 1200 (20 hours) then it will be cancelled.
+
+At a minimum, update the **copy_actions** key with your central backup vault ARN in the [aws-backup-org-policy stack](./aws-backup-org-policy.yaml) CloudFormation template.  The key value has a placeholder called **<Replace with value from pCentralBackupVaultArn>**.  You must do this for each resource defined in the template.
+
+
+### 8. Deploy CodeCommit Repository
 
 CodeCommit is used by the solution for version control and is integrated with CodePipeline to establish a CI/CD management solution.
 
@@ -307,7 +323,7 @@ Finally, deploy the CloudFormation stack to create the CodeCommit repository:
         --capabilities CAPABILITY_NAMED_IAM \
         --region <run this command in the home region of your choice>
 
-### Deploy CodePipeline
+### 9. Deploy CodePipeline
 
 CodeCommit is used by the solution for CI/CD.  CodePipeline uses the CodeCommit repository that you created.
 
@@ -324,117 +340,7 @@ The pipeline will automatically execute using the CodeCommit repository you depl
 
 The pipeline will deploy the solution components in the solution account and member accounts.  
 
-Wait until the pipeline reaches the final **DeployBackupOrgPolicy** stage.  The pipeline will fail on the final step until you deploy the **BackupOrgPolicyManagerOrgAdmin** role in the AWS Organizations Management account described in the next section.
-
-
-## Deploy the BackupOrgPolicyManagerOrgAdmin role in the AWS Organizations Management account
-
-The BackupOrgPolicyManager AWS Lambda Function assumes the **BackupOrgPolicyManagerOrgAdmin** role in the AWS Organizations Management account in order to manage backup policies for the AWS organization.
-
-You must deploy the role, BackupOrgPolicyManagerOrgAdmin into your AWS Organizations Management account so that the solution home account can assume this role to manage your AWS organizations backup policies.
-
-You should review the backup policy configuration using the guidance in the next section before you retry / re-run the **backup-recovery-aws-backup** CodePipeline in the solution management account to deploy your backup configuration.
-
-You deploy this role to a region of your choice in the AWS Organizations management account using the following command:
-
-      aws cloudformation create-stack \
-          --stack-name "aws-backup-backuporgpolicymanager-mangement-role"  \
-          --parameters ParameterKey=BackupAndRecoveryHomeAccountId,ParameterValue=<The AWS Account ID where the solution is deployed> \
-          --template-body "file://aws-backup-backuporgpolicymanager-mangement-role.yaml" \
-          --tags "Key"="Application","Value"="Backup and Recovery with AWS Backup Solution" \
-          --capabilities CAPABILITY_NAMED_IAM \
-          --region <run this command in one region of your choice>
-
-
-# AWS Organizations Backup Policy Management with CloudFormation Custom Resource - BackupOrgPolicyManager
-
-You can manage your AWS Organizations backup policies with the BackupOrgPolicyManager AWS CloudFormation custom resource.  
-
-An example is provided and integrated with your deployed AWS CodePipeline in the [aws-backup-org-policy stack](./aws-backup-org-policy.yaml).  
-
-This example implements the following policy properties:
-
-* For all supported resources in the target regions and target OUs that are tagged with the tag key **backup** and the tag value **daily**, perform a nightly backup at 05:00 UTC.  The backup will have a retention period of 35 days.  The backups will also be copied to the selected central backup vault.  If the backup doesn't complete in 1200 (20 hours) then it will be cancelled. 
-* For all supported resources in the target regions and target OUs that are tagged with the tag key **backup** and the tag value **monthly**, perform a monthly backup at 05:00 UTC on the first day of each month.  The backup will have a retention period of 366 days.  The backups will also be copied to the selected central backup vault.  If the backup doesn't complete in 1200 (20 hours) then it will be cancelled.
-
-
-## Properties 
-The following properties are supported:
-
-`PolicyName`
-  Tha name of the AWS Organizations backup policy.  This value must be unique between resources.
-
-  _Required_:  Yes
-
-  _Type_:  String
-
-  _Update requires_: Replacement
-
-`PolicyType`
-
-The AWS Organizations policy type.  Currently, the only value supported is **BACKUP_POLICY**
-
-  _Required_:  Yes
-
-  _Type_:  String
-
-  _Update requires_: Replacement
-
-
-`PolicyTargets`
-
-The target AWS Organizations organization units for this AWS Backup Policy
-
-_Required_:  Yes
-
-_Type_:  Comma Delimited List
-
-_Update requires_: Replacement
-
-
-`PolicyRegions`
-
-The target AWS regions where the backup policy should be deployed.  
-
-This should be the same value as the AWS parameter store parameter /backup/target/regions
-
-_Required_:  Yes
-
-_Type_:  Comma Delimited List
-
-_Update requires_: Replacement
-
-
-`OrgManagementAccount`
-
-The AWS Organizations Management Account ID.
-
-_Required_:  Yes
-
-_Type_:  String
-
-_Update requires_: Replacement
-
-`PolicyDescription`
-
-The description for the backup policy
-
-_Required_:  Yes
-
-_Type_:  String
-
-_Update requires_: Replacement
-
-`PolicyContent`
-
-The AWS Organizations backup policy.  See the [documentation for details on backup policy syntax](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_backup_syntax.html).
-
-_Required_:  Yes
-
-_Type_:  JSON
-
-_Update requires_: Replacement
-
+The last step in the pipeline deploys and manages the AWS Backup policies as a delegated administrator into the AWS Organizations Management account.
 
 ## Security
 
