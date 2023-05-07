@@ -24,10 +24,7 @@ The following diagram illustrates the AWS Backup automation solution discussed i
 
 <img src="./Images/Backup_Recovery_AWS_Backup_Baseline_Architecture.png" width="3000" height="350"/>
 
-#### AWS Organizations Management Account
-* Backup Policy Management Role (**BackupOrgPolicyManagerOrgAdmin**):
-
-#### **Home Account:**
+#### **Solution Home Account:**
 * Solution CodeCommit Repository - **backup-recovery-with-aws-backup**:  This repository stores all the scripts and templates for the solution.
 * Solution CodePipeline - **backup-recovery-with-aws-backup**:  This pipeline orchestrates the deployment of all solution components.
 * KMS Key for CodePipeline artifacts - **aws-backup-codepipeline-kms**: 
@@ -35,10 +32,8 @@ The following diagram illustrates the AWS Backup automation solution discussed i
 * Solution CodeBuild Projects: 
   * **ValidateTemplates**: 
   * **TestAndPackageTagOnRestore**: 
-  * **TestAndPackageBackupOrgPolicyManager**: 
 * Deployment S3 Bucket (auto generated name): 
 * Lambda Deployment Bucket - For Each Target Region **(lambda-deployment-bucket-${AWS::AccountId}-${AWS::Region})**:
-* AWS Organizations Backup Policy Manager Lambda Function (**BackupOrgPolicyManager**)
 * Systems Manager Parameter Store Parameters: 
   * **/backup/bucket**:
   * **/backup/home-account**:
@@ -55,7 +50,7 @@ The following diagram illustrates the AWS Backup automation solution discussed i
 * Central AWS Backup KMS Key (**AWSBackupSolutionCentralKey**)
 * Central AWS Backup Service Role (**AWSBackupSolutionCentralAccountRole**)
 
-#### AWS Backup Account Target Accounts
+#### AWS Organizations Accounts managed with AWS Backup Organization Policy
 * AWS Backup Account Vault (**AWSBackupSolutionVault**)
 * AWS Backup Account KMS Key (**AWSBackupSolutionKey**)
 * AWS Backup Account Service Role (**AWSBackupSolutionRole**)
