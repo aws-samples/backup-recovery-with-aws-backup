@@ -94,7 +94,7 @@ Take the following steps to enable delegated administrator permissions for your 
 Follow the instructions below, confirming that each created CloudFormation stack is in the **CREATE_COMPLETE** state 
 before proceeding with the next step.
 
-## Grant AWS Organizations Delegated Administrator permissions for AWS Backup Policies to the solution account
+## Grant solution home account Delegated Administrator permissions for AWS Organizations Backup Policies
 Before you can manage and update AWS Organizations backup policies from another AWS account, you need to grant that account permissions via a [resource-based delegation policy](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_delegate_policies.html) in your AWS Organizations management account.  
 
 The [aws-backup-org-resource-policy-delegate-backup-policy-mgmt.yaml](aws-backup-org-resource-policy-delegate-backup-policy-mgmt.yaml) CloudFormation template has been provided to deploy a resource-based delegation policy that grants the AWS account you have chosen for the solution to manage AWS Backup policies for the AWS organization.
