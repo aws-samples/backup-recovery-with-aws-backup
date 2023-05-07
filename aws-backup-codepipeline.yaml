@@ -162,54 +162,6 @@ Resources:
           Actions:
             - InputArtifacts:
                 - Name: SourceArtifacts
-              Name: Deploy_BackupOrgPolicyManagerRole
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Version: '1'
-                Provider: CloudFormation
-              Configuration:
-                ActionMode: CREATE_UPDATE
-                StackName: aws-backup-backuporgpolicymanager-role
-                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
-                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
-                TemplatePath: SourceArtifacts::Lambda/BackupOrgPolicyManager/aws-backup-backuporgpolicymanager-role.yaml
-                TemplateConfiguration: SourceArtifacts::template-configurations/aws-backup-backuporgpolicymanager-role.json
-              #                OutputFileName:
-              #                ParameterOverrides:
-              RunOrder: 1
-
-            - InputArtifacts:
-                - Name: SourceArtifacts
-              Name: Test_Package_BackupOrgPolicyManager
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Version: '1'
-                Provider: CodeBuild
-              Configuration:
-                ProjectName:  AWSBackup-TestAndPackageBackupOrgPolicyManager
-              RunOrder: 2
-            - InputArtifacts:
-                - Name: SourceArtifacts
-              Name: Deploy_BackupOrgPolicyManager
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Version: '1'
-                Provider: CloudFormation
-              Configuration:
-                ActionMode: CREATE_UPDATE
-                StackName: aws-backup-backuporgpolicymanager
-                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole"
-                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
-                TemplatePath: SourceArtifacts::Lambda/BackupOrgPolicyManager/aws-backup-backuporgpolicymanager.yaml
-                TemplateConfiguration: SourceArtifacts::template-configurations/aws-backup-backuporgpolicymanager.json
-              #                OutputFileName:
-              #                ParameterOverrides:
-              RunOrder: 3
-            - InputArtifacts:
-                - Name: SourceArtifacts
               Name: Deploy_TagOnRestoreRole
               ActionTypeId:
                 Category: Deploy
@@ -378,7 +330,6 @@ Resources:
                   - codebuild:ListBuildsForProject
                 Resource:
                   - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/AWSBackup-ValidateTemplates"
-                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/AWSBackup-TestAndPackageBackupOrgPolicyManager"
                   - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/AWSBackup-TestAndPackageTagOnRestore"
               - Effect: Allow
                 Action:

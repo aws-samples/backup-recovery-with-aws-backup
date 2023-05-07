@@ -3,7 +3,6 @@
     "pOrgBackupTargetOUs": "/backup/target/organizational-units",
     "pRegions": "/backup/target/regions",
     "pCentralBackupVaultArn": "/backup/central-vault-arn",
-    "OrgManagementAccount": "/backup/org-management-account",
     "pBackupTagKey1": "backup",
     "pBackupTagValue1": "daily",
     "pBackupTagKey2": "backup",

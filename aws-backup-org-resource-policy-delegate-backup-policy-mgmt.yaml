@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template should be deployed in the AWS Organizations management account to delegate backup policy management to the solution account.
+
+Parameters:
+  SolutionHomeAccountId:
+    Description: The solution home AWS Account ID where CodePipeline is deployed
+    Type: String
+
+
+Resources:
+  DelegateBackupPolicyMgmt:
+    Type: AWS::Organizations::ResourcePolicy
+    Properties:
+      Content:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowOrganizationsRead
+            Effect: Allow
+            Principal:
+              AWS: !Ref SolutionHomeAccountId
+            Action:
+              - organizations:Describe*
+              - organizations:List*
+            Resource: "*"
+          - Sid: AllowBackupPoliciesCreation
+            Effect: Allow
+            Principal:
+              AWS: !Ref SolutionHomeAccountId
+            Action:
+              - organizations:CreatePolicy
+            Resource: "*"
+            Condition:
+              StringEquals:
+                organizations:PolicyType: BACKUP_POLICY
+          - Sid: AllowBackupPoliciesModification
+            Effect: Allow
+            Principal:
+              AWS: !Ref SolutionHomeAccountId
+            Action:
+              - organizations:DescribePolicy
+              - organizations:UpdatePolicy
+              - organizations:DeletePolicy
+            Resource:
+              - !Sub "arn:aws:organizations::${AWS::AccountId}:policy/*/backup_policy/*"
+            Condition:
+              StringEquals:
+                organizations:PolicyType: BACKUP_POLICY
+          - Sid: AllowBackupPoliciesAttachmentAndDetachmentToAllAccountsAndOUs
+            Effect: Allow
+            Principal:
+              AWS: !Ref SolutionHomeAccountId
+            Action:
+              - organizations:AttachPolicy
+              - organizations:DetachPolicy
+            Resource:
+              - !Sub "arn:aws:organizations::${AWS::AccountId}:root/*"
+              - !Sub "arn:aws:organizations::${AWS::AccountId}:ou/*"
+              - !Sub "arn:aws:organizations::${AWS::AccountId}:account/*"
+              - !Sub "arn:aws:organizations::${AWS::AccountId}:policy/*/backup_policy/*"
+            Condition:
+              StringEquals:
+                organizations:PolicyType: BACKUP_POLICY
+
+
