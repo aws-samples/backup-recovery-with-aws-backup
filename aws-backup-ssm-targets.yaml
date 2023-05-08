@@ -78,7 +78,7 @@ Resources:
   AWSBackupOrgManagementAccount:
     Type: AWS::SSM::Parameter
     Properties:
-      Description: "Target home account for Backup and Recovery with AWS Backup solution"
+      Description: "Organization's management account for Backup and Recovery with AWS Backup solution"
       Name: "/backup/org-management-account"
       Type: String
       Value: !Ref OrgManagementAccount
