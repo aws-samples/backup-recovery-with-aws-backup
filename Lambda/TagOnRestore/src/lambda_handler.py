@@ -18,7 +18,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import os
 import logging
 import traceback
-from TagOnRestore import TagOnRestore
+from TagReplicator import TagReplicator
 
 
 logger = logging.getLogger()
@@ -35,7 +35,7 @@ def handler(event, context):
     Entry point for the Lambda function.
     """
     logger.info(f'Event : {event}')
-    tag_replicator = TagOnRestore(event, context)
+    tag_replicator = TagReplicator(event, context)
 
     if event.get('source') == 'aws.backup':
         try:

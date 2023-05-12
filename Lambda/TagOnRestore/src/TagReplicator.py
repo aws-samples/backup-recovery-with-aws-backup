@@ -36,9 +36,9 @@ logger.setLevel(logging.INFO)
 ######################################################################
 
 
-class TagOnRestore:
+class TagReplicator:
     """
-    TagOnRestore Controller class. Handles all resource operations and logic.
+    TagReplicator Controller class. Handles all resource operations and logic.
     """
 
     # INIT
@@ -52,8 +52,8 @@ class TagOnRestore:
         self.function_arn = context.invoked_function_arn
 
         # Extract the Uid from the ARN
-        self.tag_replicator_stack_id = os.environ.get('TagOnRestoreStackId').split('/')[2]
-        self.tags_to_exclude_when_copying = os.environ.get('TagOnRestoreTagsToExclude')
+        self.tag_replicator_stack_id = os.environ.get('TagReplicatorStackId').split('/')[2]
+        self.tags_to_exclude_when_copying = os.environ.get('TagReplicatorTagsToExclude')
         if not self.tags_to_exclude_when_copying:
             self.tags_to_exclude_when_copying = 'aws:backup:source-resource'    
         self.tags_to_exclude_when_copying = self.tags_to_exclude_when_copying.split(',')
@@ -89,9 +89,14 @@ class TagOnRestore:
         if -1 != resource_arn.find('/'):
             # Handle for EC2 and EBS
             resource_id = resource_arn.split("/")[1]
-        # Assumed to like  "ResourceArn":"arn:aws:rds:{RegionId}:{AccountId}:db:{DBName}"
+        elif -1 != resource_arn.find(':::'):
+            # Handle for S3
+            # arn:aws:backup:eu-west-2:01234567890:recovery-point:foo-remote-state-01234567890-20230218001954-0a483b0b
+            resource_id = resource_arn.split(":::")[1]            
         else:
             resource_id = resource_arn
+            
+        logger.info(f"get_resource_id_from_arn, resource_id :{resource_id}")
         return resource_id
 
     def __set_tags_by_resource(self, resource_type, resource_id, resource_arn, tag_list):
@@ -100,38 +105,55 @@ class TagOnRestore:
         """
         resource_type = resource_type.lower()
         logger.info(f"Processing __set_tags_by_resource with resource_type: {resource_type}, " +
-             f"resource_arn : {resource_arn},resource_id : {resource_id}, tag_list : {tag_list}" +
+             f"resource_arn : {resource_arn},resource_id : {resource_id}, original tag_list : {tag_list}" +
              f"tag exclusions : {self.tags_to_exclude_when_copying}")
 
-
+        modified_tag_list = []
         for tag_info in tag_list:
-            if tag_info['Key'] in self.tags_to_exclude_when_copying:
-                tag_list.remove(tag_info)
+            if tag_info['Key'] not in self.tags_to_exclude_when_copying and not tag_info['Key'].startswith('aws:'):
+                modified_tag_list.append(tag_info)
 
+        logger.info(f"modified_tag_list : {modified_tag_list}")
+        
         if resource_type == 'dynamodb':
             dynamo_client = boto3.client('dynamodb')
-            dynamo_client.tag_resource(ResourceArn=resource_arn, Tags=tag_list)
+            dynamo_client.tag_resource(ResourceArn=resource_arn, Tags=modified_tag_list)
 
         elif resource_type in ('ec2', 'ebs'):
             ec2_client = boto3.client('ec2')
-            ec2_client.create_tags(DryRun=False, Resources=[resource_id], Tags=tag_list)
+            ec2_client.create_tags(DryRun=False, Resources=[resource_id], Tags=modified_tag_list)
 
         elif resource_type in ('rds', 'aurora'):
             rds_client = boto3.client('rds')
-            rds_client.add_tags_to_resource(ResourceName=resource_id, Tags=tag_list)
+            rds_client.add_tags_to_resource(ResourceName=resource_id, Tags=modified_tag_list)
 
         elif resource_type == 'fsx':
             fsx_client = boto3.client('fsx')
-            fsx_client.tag_resource(ResourceARN=resource_arn, Tags=tag_list)
+            fsx_client.tag_resource(ResourceARN=resource_arn, Tags=modified_tag_list)
 
         elif resource_type == 'storagegateway':
             storagegateway_client = boto3.client('storagegateway')
             storagegateway_client.add_tags_to_resource(ResourceARN=resource_arn,
-                                                       Tags=tag_list)
+                                                       Tags=modified_tag_list)
 
         elif resource_type in ('elasticfilesystem', 'efs'):
             efs_client = boto3.client('efs')
-            efs_client.create_tags(FileSystemId=resource_id, Tags=tag_list)
+            efs_client.create_tags(FileSystemId=resource_id, Tags=modified_tag_list)
+            
+        elif resource_type in ('neptune'):
+            neptune_client = boto3.client('neptune')
+            neptune_client.add_tags_to_resource(ResourceName=resource_arn,Tags=modified_tag_list)
+            
+        elif resource_type in ('docdb','documentdb'):
+            docdb_client = boto3.client('docdb')
+            docdb_client.add_tags_to_resource(ResourceName=resource_arn,Tags=modified_tag_list)
+         
+        elif resource_type in ('s3'):
+            s3_client = boto3.client('s3')
+            tag_set = {'TagSet':modified_tag_list}
+            logger.info(f'put_bucket_tagging with : {tag_set}')
+            s3_client.put_bucket_tagging(Bucket=resource_id,Tagging=tag_set)
+                                 
         else:
             logger.info(f"{resource_type} Not Supported Yet, Fetchable from backup")
 
@@ -142,40 +164,40 @@ class TagOnRestore:
         logger.info(f"__get_tags_by_resource resource_type {resource_type}, " +
              f"resourceArn : {resource_arn}, recovery_point_arn : {recovery_point_arn}")
 
-        resource_id = self.get_resource_id_from_arn(resource_arn)
-
         resource_tag_list = {}
         recovery_point_tag_list = {}
         resource_type = resource_type.lower()
         backup_client = boto3.client('backup')
 
-        if resource_type in ('elasticfilesystem', 'efs'):
-            # Try getting tags from AWS Backup for supported resources
-            # Get Tags for the recovery point
-            # boto3 API /services/backup.html#Backup.Client.list_tags
-            try:
-    
-                recovery_point_tag_list = backup_client.list_tags(ResourceArn=recovery_point_arn)
-                if 'ResponseMetadata' in recovery_point_tag_list:
-                    del recovery_point_tag_list['ResponseMetadata']
-    
-            except botocore.exceptions.ClientError as e:
-                # Suppress as only EFS supported as of April 2021 -
-                # AccessDeniedException (Not supported)
-                # and InvalidParameterValueException (Missing recovery point)
-                logger.error(f"{e.response['Error']}")
+        try:
 
-        try:    
-            resource_tag_list = self.get_resource_tags(resource_type,resource_id,resource_arn)
+            recovery_point_tag_list = backup_client.list_tags(ResourceArn=recovery_point_arn)
+            if 'ResponseMetadata' in recovery_point_tag_list:
+                del recovery_point_tag_list['ResponseMetadata']
+
+        except botocore.exceptions.ClientError as e:
+            # AccessDeniedException (Not supported)
+            # and InvalidParameterValueException (Missing recovery point)
+            logger.error(f"{e.response['Error']}")
+
+        try:   
+            logger.info(f'Attempting to get tags from Recovery Point ARN : {recovery_point_arn}')
+            try:
+                query_resource_id = self.get_resource_id_from_arn(recovery_point_arn)
+                resource_tag_list = self.get_resource_tags(resource_type,query_resource_id,resource_arn)
+            except Exception as e:
+                logger.error(f"Error attempting to get tags from Recovery Point ARN : {recovery_point_arn} as {e}")
+                
+
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == "ResourceNotFoundException": 
                 #Try to get the tags from the recovery point
                 logger.error(f"Resource not fouund. Falling back to recovery_point_arn")
         
         if not 'Tags' in resource_tag_list or len(resource_tag_list['Tags']) == 0:
-            logger.info('No tags extracted from original resource. Attempting tag extraction from recovery_point_arn')
-            resource_id = self.get_resource_id_from_arn(recovery_point_arn)
-            resource_tag_list = self.get_resource_tags(resource_type,resource_id,resource_arn)
+            logger.info('No tags extracted from recovery point. Attempting tag extraction from original resource : {resource_arn}')
+            query_resource_id = self.get_resource_id_from_arn(resource_arn)            
+            resource_tag_list = self.get_resource_tags(resource_type,query_resource_id,resource_arn)
 
         if 'ResponseMetadata' in resource_tag_list:
             del resource_tag_list['ResponseMetadata']
@@ -193,7 +215,7 @@ class TagOnRestore:
 
         if not name_exist:
             # Handle RDS Naming arn:aws:rds:*:*:db:{DBName}
-            resource_id = resource_id.split(':')[-1]
+            resource_id = resource_arn.split(':')[-1]
             # Handle instance/{InstanceId}
             resource_id = resource_id.split('/')[-1]
             logger.info(f"Name Tag not Found.Adding Name Tag with ResourceId : {resource_id}")
@@ -205,10 +227,13 @@ class TagOnRestore:
                 # Merge the tags - From resource and Recovery point
                 for recovery_point_tag_key, recovery_point_tag_value in \
                         recovery_point_tag_list['Tags'].items():
-                    logger.info(
-                        f"Appending recovery point Tags : {recovery_point_tag_key},{recovery_point_tag_value} to tags : {resource_tag_list['Tags']} ")
-                    resource_tag_list['Tags'].append(
-                        {'Key': recovery_point_tag_key, 'Value': recovery_point_tag_value})
+                    if not recovery_point_tag_key in recovery_point_tag_list['Tags']:
+                        logger.info(
+                            f"Appending recovery point Tags : {recovery_point_tag_key},{recovery_point_tag_value} to tags : {resource_tag_list['Tags']} ")
+                        resource_tag_list['Tags'].append(
+                            {'Key': recovery_point_tag_key, 'Value': recovery_point_tag_value})
+                    else:
+                        logger.info(f'recovery_point_tag_key :{recovery_point_tag_key} already exists.')
 
         except Exception as e:
             logger.error(f"Error merging tags : {e}")
@@ -222,7 +247,7 @@ class TagOnRestore:
         """
         Helper function to get Tags for a given resource detail
         """  
-        logger.info(f"Getting resoruce tags for type : {resource_type} with Id : {resource_id} under ARN : {resource_arn}")
+        logger.info(f"Getting resource tags for type : {resource_type} with Id : {resource_id} under ARN : {resource_arn}")
         if resource_type == 'dynamodb':
             dynamo = boto3.client('dynamodb')
             # bot3 API /services/dynamodb.html#DynamoDB.Client.list_tags_of_resource
@@ -266,6 +291,26 @@ class TagOnRestore:
         elif resource_type in ('elasticfilesystem', 'efs'):
             efs_client = boto3.client('efs')
             resource_tag_list = efs_client.list_tags_for_resource(ResourceId=resource_id)
+        elif resource_type in ('neptune'):
+            neptune_client = boto3.client('neptune')
+            resource_tag_list = neptune_client.list_tags_for_resource(ResourceName=resource_arn)
+            # Return is different from other resources. Unify the section
+            resource_tag_list['Tags'] = resource_tag_list.pop('TagList')
+            
+        elif resource_type in ('docdb','documentdb'):
+            docdb_client = boto3.client('docdb')
+            resource_tag_list = docdb_client.list_tags_for_resource(ResourceName=resource_arn)
+            # Return is different from other resources. Unify the section
+            resource_tag_list['Tags'] = resource_tag_list.pop('TagList')         
+        elif resource_type in ('s3'):
+            s3_client = boto3.client('s3')
+            resource_tag_list = s3_client.get_bucket_tagging(Bucket=resource_id)
+            if 'ResponseMetadata' in resource_tag_list:
+                del resource_tag_list['ResponseMetadata']
+            
+            if 'TagSet' in resource_tag_list:
+                resource_tag_list['Tags'] = resource_tag_list.pop('TagSet')
+
         else:
             logger.info(f"{resource_type} Not Supported Yet, Fetchable from backup")
         
@@ -283,6 +328,7 @@ class TagOnRestore:
         if 'ResponseMetadata' in restore_info:
             del restore_info['ResponseMetadata']
 
+        logger.info(f"Processing restore_info :{restore_info}")
         backup_client = boto3.client('backup')
         # https://docs.aws.amazon.com/aws-backup/latest/devguide/aws-backup-limits.html
         # boto3 API  /services/backup.html#Backup.Client.list_backup_vaults
@@ -325,7 +371,9 @@ class TagOnRestore:
                                             tag_list['Tags'])
 
             except Exception as e:
-                logger.error(f"Error : {e} processing __set_tags_by_resource")
+                var = traceback.format_exc()
+                logger.error(f"Error {var} handling __set_tags_by_resource")
+                
 
     def refresh_tags_for_existing_restore_jobs(self, event):
         backup_client = boto3.client('backup')
