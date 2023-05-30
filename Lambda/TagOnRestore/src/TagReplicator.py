@@ -181,24 +181,17 @@ class TagReplicator:
             logger.error(f"{e.response['Error']}")
 
         try:   
-            logger.info(f'Attempting to get tags from Recovery Point ARN : {recovery_point_arn}')
+            logger.info(f'Attempting to get tags from Resource ARN : {resource_arn}')
             try:
-                query_resource_id = self.get_resource_id_from_arn(recovery_point_arn)
+                query_resource_id = self.get_resource_id_from_arn(resource_arn)
                 resource_tag_list = self.get_resource_tags(resource_type,query_resource_id,resource_arn)
             except Exception as e:
                 logger.error(f"Error attempting to get tags from Recovery Point ARN : {recovery_point_arn} as {e}")
-                
-
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == "ResourceNotFoundException": 
                 #Try to get the tags from the recovery point
                 logger.error(f"Resource not fouund. Falling back to recovery_point_arn")
         
-        if not 'Tags' in resource_tag_list or len(resource_tag_list['Tags']) == 0:
-            logger.info('No tags extracted from recovery point. Attempting tag extraction from original resource : {resource_arn}')
-            query_resource_id = self.get_resource_id_from_arn(resource_arn)            
-            resource_tag_list = self.get_resource_tags(resource_type,query_resource_id,resource_arn)
-
         if 'ResponseMetadata' in resource_tag_list:
             del resource_tag_list['ResponseMetadata']
 
@@ -225,16 +218,15 @@ class TagReplicator:
         try:
             if 'Tags' in recovery_point_tag_list:
                 # Merge the tags - From resource and Recovery point
-                for recovery_point_tag_key, recovery_point_tag_value in \
-                        recovery_point_tag_list['Tags'].items():
-                    if not recovery_point_tag_key in recovery_point_tag_list['Tags']:
+                resource_tag_list_keys = [tag['Key'] for tag in resource_tag_list['Tags']]
+                for recovery_point_tag_key, recovery_point_tag_value in recovery_point_tag_list['Tags'].items():
+                    if not recovery_point_tag_key in resource_tag_list_keys:
                         logger.info(
                             f"Appending recovery point Tags : {recovery_point_tag_key},{recovery_point_tag_value} to tags : {resource_tag_list['Tags']} ")
                         resource_tag_list['Tags'].append(
                             {'Key': recovery_point_tag_key, 'Value': recovery_point_tag_value})
                     else:
                         logger.info(f'recovery_point_tag_key :{recovery_point_tag_key} already exists.')
-
         except Exception as e:
             logger.error(f"Error merging tags : {e}")
             var = traceback.format_exc()
