@@ -6,7 +6,7 @@
     "StackSetTemplate" : "deployment/aws-backup-lambda-s3-bucket.yaml",
     "StackSetDescription" : "StackSet for multi-region Lambda S3 deployment bucket",
     "AWSBackupBucketPrefix": "/backup/lambda/bucket-prefix",
-    "OrganizationID": "o-8rs93jrymj"
+    "OrganizationID": "/backup/org-id-management-account"
   },
   "Tags" : {
     "BusinessUnit" : "Engineering",

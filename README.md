@@ -36,6 +36,8 @@ The following diagram illustrates the AWS Backup automation solution discussed i
 * Lambda Deployment Bucket - For Each Target Region **(lambda-deployment-bucket-${AWS::AccountId}-${AWS::Region})**:
 * Systems Manager Parameter Store Parameters: 
   * **/backup/bucket**:
+  * **/backup/org-id-management-account**:
+  * **/backup/org-management-account**:
   * **/backup/home-account**:
   * **/backup/central-vault-arn**
   * **/backup/target/global-region**
@@ -270,6 +272,7 @@ Update the values for the following JSON keys in the [aws-backup-ssm-targets.jso
 * "**TargetGlobalRegion**" : Enter the AWS region where global resources such as IAM roles will be deployed (e.g. us-east-1)
 * "**TargetOUs**" : Enter the target AWS Organizations organizational units that contain the accounts that you will backup using the solution as a comma separated list (e.g. "ou-najk-4244kagu,ou-najk-58bsjit0")
 * "**CentralBackupVaultArn**": Enter the ARN for the Central Backup Vault where secondary copies of your backups will be stored (e.g. arn:aws:backup:us-east-1:123456789012:backup-vault:AWSBackupSolutionCentralVault)
+* "**OrgIdManagementAccount**": Enter the AWS organization for your AWS Organizations management account (e.g. "o-1234567890")
 * "**OrgManagementAccount**": Enter the AWS account number for your AWS Organizations management account (e.g. "123456789012")
 
 This parameter in this file are used by CodePipeline to deploy the [aws-backup-ssm-targets.yaml](aws-backup-ssm-targets.yaml) CloudFormation template.
