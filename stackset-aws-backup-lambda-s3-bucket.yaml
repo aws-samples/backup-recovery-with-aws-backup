@@ -21,7 +21,7 @@ Parameters:
     Type: AWS::SSM::Parameter::Value<String>
   OrganizationID:
     Description: Organization ID that should be provided access to S3 bucket
-    Type: String
+    Type: AWS::SSM::Parameter::Value<String>
 
 # Parameters for tagging
   BusinessUnit:

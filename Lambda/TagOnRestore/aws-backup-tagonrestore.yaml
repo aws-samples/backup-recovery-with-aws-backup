@@ -68,7 +68,7 @@ Resources:
       Description: Function to manage AWS Backup events and trigger replicator code
       Handler: lambda_handler.handler
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/${TagOnRestoreFunctionForAWSBackupLambdaRoleName}"
-      Runtime: python3.7
+      Runtime: python3.12
       MemorySize: 1024
       Timeout: 600
       Code:
