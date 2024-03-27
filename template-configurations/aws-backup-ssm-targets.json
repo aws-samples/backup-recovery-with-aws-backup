@@ -3,6 +3,7 @@
     "TargetHomeAccount" : "Enter the AWS Account number for the management solution home. (eg: 123456789012)",
     "TargetRegions" : "Enter the AWS regions that you will backup using the solution as a comma separated list (eg: us-east-1,us-east-2)",
     "TargetGlobalRegion" : "Enter the AWS region where global resources such as IAM roles will be deployed (eg: us-east-1)",
+    "OrgIdManagementAccount": "Enter the AWS Organization ID for your AWS organization (e.g. o-1234567890)",
     "TargetOUs" : "Enter the target AWS Organizations organizational units that contain the accounts that you will backup using the solution as a comma separated list (e.g. \"ou-abcd-1234abcd,ou-abcd-7890abcd\")",
     "CentralBackupVaultArn": "Enter the ARN for the Central Backup Vault where secondary copies of your backups will be stored (e.g. arn:aws:backup:us-east-1:123456789012:backup-vault:AWSBackupSolutionCentralVault)",
     "OrgManagementAccount": "Enter the AWS account number for your AWS Organizations management account (eg: 123456789012)"
