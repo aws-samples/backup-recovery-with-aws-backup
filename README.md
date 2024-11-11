@@ -95,7 +95,7 @@ The [aws-backup-org-resource-policy-delegate-backup-policy-mgmt.yaml](./cloudfor
 
 Deploy this template in your AWS Organizations Management account using the AWS console or run this command using the AWS CLI.  
 
-Make sure your permissions are set to your AWS Organizations management account before using this CLI command:
+If you prefer, you can use the AWS CLI to deploy the policy in the AWS Organizations management account.  Make sure your permissions are set to your AWS Organizations management account before using this CLI command:
 
       aws cloudformation create-stack \
           --stack-name "aws-backup-org-resource-policy-delegate-backup-policy-mgmt"  \
