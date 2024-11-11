@@ -24,86 +24,6 @@ This solution is designed to be modified to fit your specific requirements.
 * Separate AWS Account for solution: A separate AWS account within your AWS Organizations must be selected to deploy and manage the solution.  Implementing the solution in a separate account improves security and reduces the need to provide access to your AWS Organizations management account.
 * Separate AWS Account for secondary backups:  A secondary account is used as a secondary store for backup copies.  This account will receive a copy of each backup performed in the organization for the organization units you have specified in the solution.  You should choose an account where permissions have been limited appropriately to administrative users.  The solution utilizes a central AWS Backup Vault and KMS key in a region of your choice.  You may decide to use a different region than your backed up resources based on your requirements.
 
-## Solution Components
-
-#### **Solution Home Account:**
-* CodePipeline - **backup-recovery-with-aws-backup**:  This pipeline orchestrates the deployment of all solution components.
-* KMS Key for CodePipeline artifacts - **aws-backup-codepipeline-kms** 
-* IAM Service Role for AWS CloudFormation - **CloudFormationRole**
-* Solution CodeBuild Projects: 
-  * **ValidateTemplates**: This CodeBuild project performs static analysis on the CloudFormation templates used in the solution using [cfn-nag](https://github.com/stelligent/cfn_nag).
-* Deployment S3 Bucket (auto generated name): 
-* Systems Manager Parameter Store Parameters:
-  The cloudformation stack requests the values of each of these parameters when you deploy the solution, grouped by area:
-  * **/backup/org-id**:  The AWS Organizations ID where backup policies will be administered.
-  * **/backup/bucket**:  S3 bucket used to store source artifacts for Backup and Recovery with AWS Backup solution.
-  * **/backup/solution-ou**:  AWS AWS Organizations Unit for the Solution home account.
-  * **/backup/central-account-ou**:  The AWS OU for the central account that will be the secondary store for all AWS Backups.  Secondary copies and restore testing will be in an account within this OU
-  * **/backup/central-account-id**:  The AWS Account ID for the central account that will be the secondary store for all AWS Backups.  Secondary copies and restore testing will be in this account.
-  * **/backup/central-account-region**:  The region for the central account that will be the secondary store for all AWS Backups.  Secondary copies and restore testing will be in this region.
-  * **/backup/central-vault-arn**: The ARN for the Central Backup Vault that will be the secondary store for all AWS Backups.
-  * **/backup/testing/restore-test-schedule**: The CRON job schedule for the restore test plan.
-  * **/backup/testing/ec2/subnetId**:  The subnet for EC2 restore testing.
-  * **/backup/testing/ec2/securityGroupIds**:  The restore security group IDs for EC2 restore testing.
-  * **/backup/testing/ec2/validation-window-hours**:  The number of hours to keep the EC2 instance active for restore testing validation.
-  * **/backup/testing/selection-window-days**:  The number of days to select recovery points.
-  * **/backup/testing/start-window-hours**:  The number of hours for the restore testing start window.
-  * **/backup/testing/ec2/tag-key**:  The tag key used for selecting resources.
-  * **/backup/testing/ec2/tag-value**:  The tag value used for selecting resources.
-  * **/backup/target/global-region**:  Target region for global resources for Backup and Recovery with AWS Backup solution
-  * **/backup/target/regions**:  Target regions for Backup and Recovery with AWS Backup solution
-  * **/backup/target/organizational-units**:  Target OUs for Backup and Recovery with AWS Backup solution
-  * **/backup/control1**:  Do you want to evaluates if resources are included in at least one backup plan?
-  * **/backup/demo/ec2-instance-type**:  The instance type for demo EC2 instances
-  * **/backup/demo/vpc-cidr**:  The CIDR for the demo VPC
-  * **/backup/demo/subnet-cidr**: The CIDR for the demo subnet
-  * **/backup/demo/tag-key**: The tag key to apply to demo resources - align to AWS Backup policy
-  * **/backup/demo/tag-value**: The tag value to apply to demo resources - align to AWS Backup policy
-  * **/backup/control2**: Do you want to evaluate if backup frequency is at least x days and retention period is at least y days?
-  * **/backup/control3**: Do you want to evaluate if backup vaults do not allow manual deletion of recovery points except by certain AWS Identity and Access Management (IAM) roles?
-  * **/backup/control4**: Do you want to evaluate if the recovery points are encrypted?
-  * **/backup/control5**: Do you want to evaluate if the recovery point retention period is at least x days?
-  * **/backup/control6**: Do you want to evaluate if a resource is configured to create copies of its backups to another AWS Region?
-  * **/backup/control7**: Do you want to evaluate if a resource has a cross-account backup copy configured?
-  * **/backup/control8**: Do you want to evaluate if a resource is configured to have backups in a locked backup vault?
-  * **/backup/control9**: Do you want to evaluate if a recovery point was created within the specified time frame?
-  * **/backup/control10**: Do you want to evaluate if the restore testing job completed within the target restore time?
-  * **/backup/backupplan1**: Do you want to create a Resource Compliance Report Plan?
-  * **/backup/backupplan2**: Do you want to create a Control Compliance Report Plan?
-  * **/backup/backupplan3**: Do you want to create a Backup Job Report Plan?
-  * **/backup/backupplan4**: Do you want to create a Copy Job Report Plan?
-  * **/backup/backupplan5**: Do you want to create a Restore Job Report Plan?
-
-#### **Central AWS Backup Account:**
-
-* ##### Secondary Storage:
-  * Central AWS Backup Vault (**AWSBackupSolutionCentralVault**)
-  * Central AWS Backup KMS Key (**AWSBackupSolutionCentralKey**)
-  * Central AWS Backup Service Role (**AWSBackupSolutionCentralAccountRole**)
-
-* ##### Restore Testing and Validation:
-  * AWS Backup Restore Testing Role (AWSBackupRestoreTestingRole)
-  * AWS Backup Restore Testing Plan (RestoreTestPlan)
-  * AWS Lambda Execution Role (AWSBackupRestoreTestValidationLambdaExecutionRole)
-  * AWS Lambda Restore Testing Validation Function (RestoreTestingValidationLambda)
-  * AWS Events Rule - Restore Job Completed (BackupRestoreJobStateChangeRule)
-
-#### **Each Target AWS Organizations Account for Backup:**
-* AWS Backup Account Vault (**AWSBackupSolutionVault**)
-* AWS Backup Account KMS Key (**AWSBackupSolutionKey**)
-* AWS Backup Account Service Role (**AWSBackupSolutionRole**)
-* AWS Config Bucket (rConfigBucket)
-* AWS Config Recorder (rConfigRecorder)
-* AWS Backup Audit Frameworks (rFramework)
-* Demo Resources
-  * VPC
-  * Subnet
-  * Internet Gateway
-  * Route Table
-  * 3 EC2 Launch Templates
-  * 3 EC2 Fleets
-  * Security Group
-  * IAM Role and corresponding EC2 Instance Profile
 
 ## Prepare
 
@@ -349,6 +269,88 @@ This service control policies ensures that AWS organizations accounts do not sha
 You can deploy the [limit-copy-from-vault-to-org.yaml](cloudformation%2Fstacks%2Fscp%2Flimit-copy-from-vault-to-org.yaml) CloudFormation template to limit AWS Backup Vault copies to within the AWS Organization.  
 
 This is less restrictive than the [limit-copy-from-vault-to-central-vault.yaml](cloudformation%2Fstacks%2Fscp%2Flimit-copy-from-vault-to-central-vault.yaml) CloudFormation template because it allows accounts within your AWS Backup account to potentially share their AWS Backup vault with other accounts within your AWS organization.
+
+## Solution Components
+
+#### **Solution Home Account:**
+* CodePipeline - **backup-recovery-with-aws-backup**:  This pipeline orchestrates the deployment of all solution components.
+* KMS Key for CodePipeline artifacts - **aws-backup-codepipeline-kms**
+* IAM Service Role for AWS CloudFormation - **CloudFormationRole**
+* Solution CodeBuild Projects:
+  * **ValidateTemplates**: This CodeBuild project performs static analysis on the CloudFormation templates used in the solution using [cfn-nag](https://github.com/stelligent/cfn_nag).
+* Deployment S3 Bucket (auto generated name):
+* Systems Manager Parameter Store Parameters:
+  The cloudformation stack requests the values of each of these parameters when you deploy the solution, grouped by area:
+  * **/backup/org-id**:  The AWS Organizations ID where backup policies will be administered.
+  * **/backup/bucket**:  S3 bucket used to store source artifacts for Backup and Recovery with AWS Backup solution.
+  * **/backup/solution-ou**:  AWS AWS Organizations Unit for the Solution home account.
+  * **/backup/central-account-ou**:  The AWS OU for the central account that will be the secondary store for all AWS Backups.  Secondary copies and restore testing will be in an account within this OU
+  * **/backup/central-account-id**:  The AWS Account ID for the central account that will be the secondary store for all AWS Backups.  Secondary copies and restore testing will be in this account.
+  * **/backup/central-account-region**:  The region for the central account that will be the secondary store for all AWS Backups.  Secondary copies and restore testing will be in this region.
+  * **/backup/central-vault-arn**: The ARN for the Central Backup Vault that will be the secondary store for all AWS Backups.
+  * **/backup/testing/restore-test-schedule**: The CRON job schedule for the restore test plan.
+  * **/backup/testing/ec2/subnetId**:  The subnet for EC2 restore testing.
+  * **/backup/testing/ec2/securityGroupIds**:  The restore security group IDs for EC2 restore testing.
+  * **/backup/testing/ec2/validation-window-hours**:  The number of hours to keep the EC2 instance active for restore testing validation.
+  * **/backup/testing/selection-window-days**:  The number of days to select recovery points.
+  * **/backup/testing/start-window-hours**:  The number of hours for the restore testing start window.
+  * **/backup/testing/ec2/tag-key**:  The tag key used for selecting resources.
+  * **/backup/testing/ec2/tag-value**:  The tag value used for selecting resources.
+  * **/backup/target/global-region**:  Target region for global resources for Backup and Recovery with AWS Backup solution
+  * **/backup/target/regions**:  Target regions for Backup and Recovery with AWS Backup solution
+  * **/backup/target/organizational-units**:  Target OUs for Backup and Recovery with AWS Backup solution
+  * **/backup/control1**:  Do you want to evaluates if resources are included in at least one backup plan?
+  * **/backup/demo/ec2-instance-type**:  The instance type for demo EC2 instances
+  * **/backup/demo/vpc-cidr**:  The CIDR for the demo VPC
+  * **/backup/demo/subnet-cidr**: The CIDR for the demo subnet
+  * **/backup/demo/tag-key**: The tag key to apply to demo resources - align to AWS Backup policy
+  * **/backup/demo/tag-value**: The tag value to apply to demo resources - align to AWS Backup policy
+  * **/backup/control2**: Do you want to evaluate if backup frequency is at least x days and retention period is at least y days?
+  * **/backup/control3**: Do you want to evaluate if backup vaults do not allow manual deletion of recovery points except by certain AWS Identity and Access Management (IAM) roles?
+  * **/backup/control4**: Do you want to evaluate if the recovery points are encrypted?
+  * **/backup/control5**: Do you want to evaluate if the recovery point retention period is at least x days?
+  * **/backup/control6**: Do you want to evaluate if a resource is configured to create copies of its backups to another AWS Region?
+  * **/backup/control7**: Do you want to evaluate if a resource has a cross-account backup copy configured?
+  * **/backup/control8**: Do you want to evaluate if a resource is configured to have backups in a locked backup vault?
+  * **/backup/control9**: Do you want to evaluate if a recovery point was created within the specified time frame?
+  * **/backup/control10**: Do you want to evaluate if the restore testing job completed within the target restore time?
+  * **/backup/backupplan1**: Do you want to create a Resource Compliance Report Plan?
+  * **/backup/backupplan2**: Do you want to create a Control Compliance Report Plan?
+  * **/backup/backupplan3**: Do you want to create a Backup Job Report Plan?
+  * **/backup/backupplan4**: Do you want to create a Copy Job Report Plan?
+  * **/backup/backupplan5**: Do you want to create a Restore Job Report Plan?
+
+#### **Central AWS Backup Account:**
+
+* ##### Secondary Storage:
+  * Central AWS Backup Vault (**AWSBackupSolutionCentralVault**)
+  * Central AWS Backup KMS Key (**AWSBackupSolutionCentralKey**)
+  * Central AWS Backup Service Role (**AWSBackupSolutionCentralAccountRole**)
+
+* ##### Restore Testing and Validation:
+  * AWS Backup Restore Testing Role (AWSBackupRestoreTestingRole)
+  * AWS Backup Restore Testing Plan (RestoreTestPlan)
+  * AWS Lambda Execution Role (AWSBackupRestoreTestValidationLambdaExecutionRole)
+  * AWS Lambda Restore Testing Validation Function (RestoreTestingValidationLambda)
+  * AWS Events Rule - Restore Job Completed (BackupRestoreJobStateChangeRule)
+
+#### **Each Target AWS Organizations Account for Backup:**
+* AWS Backup Account Vault (**AWSBackupSolutionVault**)
+* AWS Backup Account KMS Key (**AWSBackupSolutionKey**)
+* AWS Backup Account Service Role (**AWSBackupSolutionRole**)
+* AWS Config Bucket (rConfigBucket)
+* AWS Config Recorder (rConfigRecorder)
+* AWS Backup Audit Frameworks (rFramework)
+* Demo Resources
+  * VPC
+  * Subnet
+  * Internet Gateway
+  * Route Table
+  * 3 EC2 Launch Templates
+  * 3 EC2 Fleets
+  * Security Group
+  * IAM Role and corresponding EC2 Instance Profile
+
 
 ## Security
 
