@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create a service control policy to block all Backup Copy operations except to a specified central vault.
+
+Parameters:
+  CentralVaultArn:
+    Type: String
+    Description: The full ARN of the central backup vault to which copying is allowed. (Format  arn:aws:backup:<Region>:<AccountID>:backup-vault/<VaultName>)
+  RootOrgId:
+    Type: String
+    Description: The AWS Organization Root Org ID to allow for backup copy operations. Format (r-xxxxxxxxxx)
+
+Resources:
+  BackupCopySCP:
+    Type: "AWS::Organizations::Policy"
+    Properties:
+      Name: "RestrictCopyToCentralVault"
+      Description: "SCP to block all Backup Copy operations except to the specified central vault."
+      TargetIds:
+        - !Ref RootOrgId
+      Content:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "BlockAllExceptCentralCopyVault"
+            Effect: "Deny"
+            Action:
+              - "backup:CopyFromBackupVault"
+            Resource: "*"
+            Condition:
+              ForAllValues:ArnNotLike:
+                "backup:CopyTargets":
+                  - !Ref CentralVaultArn
+      Type: "SERVICE_CONTROL_POLICY"
+

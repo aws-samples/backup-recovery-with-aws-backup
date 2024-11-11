@@ -1,0 +1,490 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  This template creates audit frameworks and the config recorders in each target account. It should be deployed to each AWS Region of a member account where you intend to audit the backup activities.
+Parameters:
+  DeployControl1:
+    Description: 'Do you want to evaluates if resources are included in at least one backup plan?'
+    Type: String
+  DeployControl2:
+    Description: 'Do you want to evaluates if backup frequency is at least x day and retention period is at least y days?'
+    Type: String
+  DeployControl3:
+    Description: 'Do you want to evaluates if backup vaults do not allow manual deletion of recovery points except by certain AWS Identity and Access Management (IAM) roles?'
+    Type: String
+  DeployControl4:
+    Description: 'Do you want to evaluates if the recovery points are encrypted?'
+    Type: String
+  DeployControl5:
+    Description: 'Do you want to Evaluates if the recovery point retention period is at least x days?'
+    Type: String
+  DeployControl6:
+    Description: 'Do you want to ealuates if a resource is configured to create copies of its backups to another AWS Region?'
+    Type: String
+  DeployControl7:
+    Description: 'Do you want to evaluates if a resource has a cross-account backup copy configured?'
+    Type: String
+  DeployControl8:
+    Description: 'Do you want to evaluates if a resource is configured to have backups in locked backup vault?'
+    Type: String
+  DeployControl9:
+    Description: 'Do you want to evaluates if a recovery point was created within specified time frame?'
+    Type: String
+  DeployControl10:
+    Description: 'Do you want to evaluates if restore testing job completed within target restore time?'
+    Type: String
+  DeployConfigurationRecorder:
+    Description: 'Do you want to configure a Configuration Recorders for each region you use?'
+    Type: String
+
+  # Parameters for tagging
+  CommitId:
+    Description: The commit id for the change
+    Type: String
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default: Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default: '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    ConstraintDescription: Must be a valid environment.
+    Default: Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default: selfserviceservicecatalog@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default: Example Application
+
+Conditions:
+  DeployControl1Condition: !Equals [!Ref DeployControl1, "true"]
+  DeployControl2Condition: !Equals [!Ref DeployControl2, "true"]
+  DeployControl3Condition: !Equals [!Ref DeployControl3, "true"]
+  DeployControl4Condition: !Equals [!Ref DeployControl4, "true"]
+  DeployControl5Condition: !Equals [!Ref DeployControl5, "true"]
+  DeployControl6Condition: !Equals [!Ref DeployControl6, "true"]
+  DeployControl7Condition: !Equals [!Ref DeployControl7, "true"]
+  DeployControl8Condition: !Equals [!Ref DeployControl8, "true"]
+  DeployControl9Condition: !Equals [!Ref DeployControl9, "true"]
+  DeployControl10Condition: !Equals [!Ref DeployControl10, "true"]
+  DeployConfigurationRecorderCondition: !Equals [!Ref DeployConfigurationRecorder, "true"]
+
+Resources:
+  rConfigBucket:
+    Condition: DeployConfigurationRecorderCondition
+    DeletionPolicy: Retain
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  rConfigBucketPolicy:
+    Condition: DeployConfigurationRecorderCondition  
+    Type: AWS::S3::BucketPolicy
+    DeletionPolicy: Retain    
+    Properties:
+      Bucket: !Ref rConfigBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Sid: AWSConfigBucketPermissionsCheck
+          Effect: Allow
+          Principal:
+            Service:
+            - config.amazonaws.com
+          Action: s3:GetBucketAcl
+          Resource:
+          - !Sub "arn:${AWS::Partition}:s3:::${rConfigBucket}"
+        - Sid: AWSConfigBucketDelivery
+          Effect: Allow
+          Principal:
+            Service:
+            - config.amazonaws.com
+          Action: s3:PutObject
+          Resource:
+          - !Sub "arn:${AWS::Partition}:s3:::${rConfigBucket}/AWSLogs/${AWS::AccountId}/*"
+        - Sid: AWSConfigBucketSecureTransport
+          Action:
+          - s3:*
+          Effect: Deny
+          Resource:
+          - !Sub "arn:${AWS::Partition}:s3:::${rConfigBucket}"
+          - !Sub "arn:${AWS::Partition}:s3:::${rConfigBucket}/*"
+          Principal: "*"
+          Condition:
+            Bool:
+              aws:SecureTransport: false
+
+  rCreateConfigFunction:
+    Condition: DeployConfigurationRecorderCondition  
+    Type: AWS::Lambda::Function
+    DependsOn:
+    - rConfigBucket
+    Properties:
+      Handler: "index.lambda_handler"
+      Role: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/AWSRecorderCreationLambdaRole"
+      Code:
+        ZipFile: |
+
+          import boto3
+          import cfnresponse
+          import json
+          import logging
+
+          client = boto3.client('config')
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def get_configuration_recorder():
+              """Retrieve the Configuration Recorder information."""
+              try:
+                  response = client.describe_configuration_recorders()
+                  if not response['ConfigurationRecorders']:
+                      return None  # No Configuration Recorder exists
+                  return response['ConfigurationRecorders'][0]
+              except Exception as e:
+                  logger.error(f"Error in get_configuration_recorder: {str(e)}")
+                  raise
+
+          def is_recorder_active(recorder_name):
+              """Check if the Configuration Recorder is active."""
+              try:
+                  status_response = client.describe_configuration_recorder_status(
+                      ConfigurationRecorderNames=[recorder_name]
+                  )
+                  return status_response['ConfigurationRecordersStatus'][0]['recording']
+              except Exception as e:
+                  logger.error(f"Error in is_recorder_active: {str(e)}")
+                  raise
+
+          def add_required_resources(role_arn, existing_resources, missing_resources):
+              """Update the recorder configuration by adding required resource types."""
+              try:
+                  recorder_name = "default"
+                  updated_resources = existing_resources + missing_resources
+                  client.put_configuration_recorder(
+                      ConfigurationRecorder={
+                          'name': recorder_name,
+                          'roleARN': role_arn,
+                          'recordingGroup': {
+                              'resourceTypes': updated_resources,
+                              'allSupported': False  # Maintain individual resource settings
+                          }
+                      }
+                  )
+                  return {
+                      'statusCode': 200,
+                      'body': f"Message: Recorder has been updated by adding required resource types."
+                  }
+              except Exception as e:
+                  logger.error(f"Error in add_required_resources: {str(e)}")
+                  raise
+
+          def update_exclusion_resources(role_arn, updated_exclusion):
+              """Update the recorder configuration with new exclusion_list"""
+              try:
+                  recorder_name = "default"
+                  client.put_configuration_recorder(
+                      ConfigurationRecorder={
+                          'name': recorder_name,
+                          'roleARN': role_arn,
+                          'recordingGroup': {
+                              'allSupported': False,
+                              'resourceTypes': [],
+                              'recordingStrategy': {
+                                  'useOnly': 'EXCLUSION_BY_RESOURCE_TYPES'
+                              },
+                              'exclusionByResourceTypes': {
+                                  'resourceTypes': updated_exclusion
+                              }
+                          }
+                      }
+                  )
+                  return {
+                      'statusCode': 200,
+                      'body': f"Message: Recorder has been updated with new exclusion_list."
+                  }
+              except Exception as e:
+                  logger.error(f"Error in update_exclusion_resources: {str(e)}")
+                  raise
+
+          def activate_recorder(recorder_name, role_arn, resource_types):
+              """Activate the Configuration Recorder with specified resource types."""
+              try:
+                  client.start_configuration_recorder(ConfigurationRecorderName=recorder_name)
+                  client.put_configuration_recorder(
+                      ConfigurationRecorder={
+                          'name': recorder_name,
+                          'roleARN': role_arn,
+                          'recordingGroup': {
+                              'resourceTypes': resource_types,
+                              'allSupported': False  # Only record specified resources
+                          }
+                      }
+                  )
+                  return {
+                      'statusCode': 200,
+                      'body': f"Message: Configuration Recorder '{recorder_name}' has been activated with specified resource types."
+                  }
+              except Exception as e:
+                  logger.error(f"Error in activate_recorder: {str(e)}")
+                  raise
+
+          def create_recorder(role_arn, resource_types, config_bucket_name):
+              """Create a new Configuration Recorder with specified resource types."""
+              try:
+                  recorder_name = "default"
+                  client.put_configuration_recorder(
+                      ConfigurationRecorder={
+                          'name': recorder_name,
+                          'roleARN': role_arn,
+                          'recordingGroup': {
+                              'resourceTypes': resource_types,
+                              'allSupported': False  # Only record specified resources
+                          }
+                      }
+                  )
+
+                  client.put_delivery_channel(
+                      DeliveryChannel={
+                          'name': 'default',
+                          's3BucketName': config_bucket_name,
+                          'configSnapshotDeliveryProperties': {
+                              'deliveryFrequency': 'TwentyFour_Hours'
+                          }
+                      }
+                  )
+                  client.start_configuration_recorder(ConfigurationRecorderName=recorder_name)
+                  return {
+                      'statusCode': 200,
+                      'body': f"Message: Configuration Recorder '{recorder_name}' has been created and activated with specified resource types."
+                  }
+              except Exception as e:
+                  logger.error(f"Error in create_recorder: {str(e)}")
+                  raise
+
+          def lambda_handler(event, context):
+              logger.info(event)
+              # Retrieve the list of resource types to check from the event
+              resource_types = [
+                  'AWS::Backup::BackupPlan',
+                  'AWS::Backup::BackupSelection',
+                  'AWS::Backup::BackupVault',
+                  'AWS::Backup::RecoveryPoint',
+                  'AWS::Config::ResourceCompliance'
+              ]
+              try:
+                  request_type = event['RequestType']
+                  if request_type == 'Delete':
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {'Message': 'Do nothing.'})
+                  else:
+                      # Retrieve the Configuration Recorder
+                      recorder = get_configuration_recorder()
+                      role_arn = event.get('ResourceProperties', {}).get('role_arn', 'no_role')
+                      config_bucket_name = event.get('ResourceProperties', {}).get('s3bucket', 'no_s3_bucket')
+
+                      if recorder is None:
+                          # Create a new Configuration Recorder if it doesn't exist
+                          logger.info("No exist Recorder. We will create a new one.")
+                          create_result = create_recorder(role_arn, resource_types, config_bucket_name)
+                          cfnresponse.send(event, context, cfnresponse.SUCCESS, create_result)
+
+                      else:
+                          # Check if the recorder is active
+                          if not is_recorder_active(recorder['name']):
+                              logger.info("Recorder is disabled. We will enable it.")
+                              activate_result = activate_recorder(recorder['name'], role_arn, resource_types)
+                              cfnresponse.send(event, context, cfnresponse.SUCCESS, activate_result)
+
+                          else:
+                              if recorder['recordingGroup'].get('allSupported', False):
+                                  logger.info("All resources are already being recorded.")
+                                  response_data = {'Message': 'All resources are already being recorded.'}
+                                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+
+                              elif recorder['recordingGroup'].get('recordingStrategy', {}).get('useOnly') == 'EXCLUSION_BY_RESOURCE_TYPES':
+
+                                  exclusion_by_resource_types = recorder['recordingGroup'].get('exclusionByResourceTypes', {}).get('resourceTypes', [])
+                                  updated_exclusion = [r for r in exclusion_by_resource_types if r not in resource_types]
+
+                                  if updated_exclusion == exclusion_by_resource_types:
+                                      logger.info(f"There is nothing to remove from the exclusion list.")
+                                      response_data = {'Message': 'All resources are already being recorded.'}
+                                      cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                                  else:
+                                      logger.info(f"Some required resource types are not recorded. We will exclude them from the exclusion list.")
+                                      update_result = update_exclusion_resources(role_arn, updated_exclusion)
+                                      cfnresponse.send(event, context, cfnresponse.SUCCESS, update_result)
+
+                              else:
+                                  # Find missing resource types
+                                  recorded_resources = recorder['recordingGroup'].get('resourceTypes', [])
+                                  missing_resources = [r for r in resource_types if r not in recorded_resources]
+
+                                  if not missing_resources:
+                                      response_data = {'Message': 'All specified resources are already being recorded.'}
+                                      cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                                  else:
+                                      add_result = add_required_resources(role_arn, recorded_resources, missing_resources)
+                                      cfnresponse.send(event, context, cfnresponse.SUCCESS, add_result)
+
+              except Exception as e:
+                  logger.error(f"General error: {str(e)}")
+                  response_data = {'Message': f"Error occurred: {str(e)}"}
+                  cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+
+
+      Runtime: python3.12
+      Timeout: 30
+
+  rMyCustomResource:
+    Condition: DeployConfigurationRecorderCondition  
+    Type: Custom::MyCustomResource 
+    DependsOn:
+    - rCreateConfigFunction
+    Properties:
+      ServiceToken: !GetAtt rCreateConfigFunction.Arn
+      ServiceTimeoutServiceTimeout: 300      
+      role_arn: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig"
+      s3bucket: !Ref rConfigBucket
+
+
+  rFramework:
+    Type: AWS::Backup::Framework
+    DependsOn:
+    - rMyCustomResource
+    Properties:
+      FrameworkControls:
+      - !If
+        - DeployControl1Condition
+        - ControlName: BACKUP_RESOURCES_PROTECTED_BY_BACKUP_PLAN
+          ControlScope:
+            Tags:
+            - Key: 'backup'
+              Value: ''
+        - !Ref "AWS::NoValue"
+
+      - !If
+        - DeployControl2Condition
+        - ControlName: BACKUP_RECOVERY_POINT_MINIMUM_RETENTION_CHECK
+          ControlInputParameters:
+          - ParameterName: requiredRetentionDays
+            ParameterValue: '7'
+          ControlScope:
+            Tags:
+            - Key: 'backup'
+              Value: ''
+        - !Ref "AWS::NoValue"
+
+      - !If
+        - DeployControl3Condition
+        - ControlName: BACKUP_RECOVERY_POINT_MANUAL_DELETION_DISABLED
+        - !Ref "AWS::NoValue"
+
+      - !If
+        - DeployControl4Condition
+        - ControlName: BACKUP_PLAN_MIN_FREQUENCY_AND_MIN_RETENTION_CHECK
+          ControlInputParameters:
+          - ParameterName: requiredRetentionDays
+            ParameterValue: '7'
+          - ParameterName: requiredFrequencyUnit
+            ParameterValue: 'hours'
+          - ParameterName: requiredFrequencyValue
+            ParameterValue: '24'
+          ControlScope:
+            Tags:
+            - Key: 'backup'
+              Value: ''
+        - !Ref "AWS::NoValue"
+
+      - !If
+        - DeployControl5Condition
+        - ControlName: BACKUP_RECOVERY_POINT_ENCRYPTED
+          ControlScope:
+            Tags:
+            - Key: 'backup'
+              Value: ''
+        - !Ref "AWS::NoValue"
+
+      - !If
+        - DeployControl6Condition
+        - ControlName: BACKUP_RESOURCES_PROTECTED_BY_CROSS_REGION
+        - !Ref "AWS::NoValue"
+
+      - !If
+        - DeployControl7Condition
+        - ControlName: BACKUP_RESOURCES_PROTECTED_BY_CROSS_ACCOUNT
+          ControlScope:
+            Tags:
+            - Key: 'backup'
+              Value: ''
+        - !Ref "AWS::NoValue"
+
+      - !If
+        - DeployControl8Condition
+        - ControlName: BACKUP_RESOURCES_PROTECTED_BY_BACKUP_VAULT_LOCK
+        - !Ref "AWS::NoValue"
+
+      - !If
+        - DeployControl9Condition
+        - ControlName: BACKUP_LAST_RECOVERY_POINT_CREATED
+          ControlScope:
+            Tags:
+            - Key: 'backup'
+              Value: ''
+        - !Ref "AWS::NoValue"
+
+      - !If
+        - DeployControl10Condition
+        - ControlName: RESTORE_TIME_FOR_RESOURCES_MEET_TARGET
+          ControlInputParameters:
+          - ParameterName: maxRestoreTime
+            ParameterValue: '720'
+        - !Ref "AWS::NoValue"
+      FrameworkTags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner

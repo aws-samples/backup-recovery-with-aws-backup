@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create a service control policy to restrict copying from backup vaults except for specific organization paths.
+
+Parameters:
+  RootOrgId:
+    Type: String
+    Description: The AWS Organization Root ID to allow for backup copy operations. (Format - r-xxxxxxxxxx)
+  OrgId:
+    Type: String
+    Description: The AWS Organization ID to allow for backup copy operations. (Format - o-xxxxxxxxxx)
+
+Resources:
+  BackupCopySCP:
+    Type: "AWS::Organizations::Policy"
+    Properties:
+      Name: "RestrictCopyFromBackupVault"
+      Description: "SCP to restrict CopyFromBackupVault actions to specified organizational paths"
+      TargetIds:
+        - !Ref RootOrgId
+      Content:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Deny"
+            Action: "backup:CopyFromBackupVault"
+            Resource: "*"
+            Condition:
+              ForAllValues:StringNotLike:
+                "backup:CopyTargetOrgPaths":
+                  - !Sub "${OrgId}/*"
+      Type: "SERVICE_CONTROL_POLICY"

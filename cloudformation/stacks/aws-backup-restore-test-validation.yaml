@@ -1,0 +1,184 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EventBridge Rule to Trigger Lambda on Backup Restore Job State Change
+Parameters:
+  # Parameters for tagging
+  CommitId:
+    Description: The commit id for the change
+    Type: String
+  BusinessUnit:
+    Description: Business Unit Name.
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    Default: Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services.
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default: '00000'
+  Environment:
+    Description: Environment.
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    Default: Development
+  ApplicationOwner:
+    Description: Email address of the application owner.
+    Type: String
+    Default: someone@example.com
+  Application:
+    Description: Application Name.
+    Type: String
+    Default: Backup and Recovery with AWS Backup
+
+
+
+Resources:
+  # IAM Role for the Lambda function
+  AWSBackupRestoreTestValidationLambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: "LambdaExecutionPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "ec2:DescribeInstanceStatus"
+                  - "backup:PutRestoreValidationResult"
+                Resource: "*"
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  # Lambda Function Definition
+  RestoreTestingValidationLambda:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      FunctionName: "RestoreTestingValidation"
+      Role: !GetAtt AWSBackupRestoreTestValidationLambdaExecutionRole.Arn
+      Runtime: "nodejs18.x"
+      Handler: "index.handler"
+      Code:
+        ZipFile: |
+          const { EC2 } = require('@aws-sdk/client-ec2');
+          const { Backup } = require('@aws-sdk/client-backup');
+          
+          exports.handler = async (event) => {
+            console.log("Handling event: ", event);
+          
+            const restoreTestingPlanArn = event.detail.restoreTestingPlanArn;
+            const resourceType = event.detail.resourceType;
+            const createdResourceArn = event.detail.createdResourceArn;
+
+            // Assuming the created resource is an EC2 instance for validation
+            if (resourceType === 'EC2') {
+              const instanceId = createdResourceArn.split('/').pop(); // Extract instance ID from the ARN
+              const ec2 = new EC2();
+
+              try {
+                // Check EC2 instance status
+                const statusResponse = await ec2.describeInstanceStatus({
+                  InstanceIds: [instanceId]
+                });
+
+                const instanceStatus = statusResponse.InstanceStatuses[0];
+
+                if (
+                  instanceStatus &&
+                  instanceStatus.InstanceState.Name === 'running' &&
+                  instanceStatus.InstanceStatus.Status === 'ok' &&
+                  instanceStatus.SystemStatus.Status === 'ok'
+                ) {
+                  console.log(`EC2 instance ${instanceId} is running and healthy`);
+                } else {
+                  console.error(`EC2 instance ${instanceId} is not healthy`);
+                  throw new Error('EC2 instance health check failed');
+                }
+              } catch (error) {
+                console.error('Error during EC2 health check', error);
+                throw error;
+              }
+            }
+
+            // Backup validation result
+            const backup = new Backup();
+            try {
+              const response = await backup.putRestoreValidationResult({
+                RestoreJobId: event.detail.restoreJobId,
+                ValidationStatus: "SUCCESSFUL",
+                ValidationStatusMessage: "Resource validation succeeded"
+              });
+              console.log("PutRestoreValidationResult: ", response);
+            } catch (error) {
+              console.error("Error putting restore validation result: ", error);
+              throw error;
+            }
+
+            console.log("Finished");
+          }
+      Timeout: 120
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  # EventBridge Rule for Backup Restore Job State Change
+  BackupRestoreJobStateChangeRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      EventPattern:
+        source:
+          - "aws.backup"
+        detail-type:
+          - "Restore Job State Change"
+        detail:
+          resourceType:
+            - "EC2"
+          restoreTestingPlanArn:
+            - !ImportValue RestoreTestingPlanArn  # Import the ARN from the first template
+          status:
+            - "COMPLETED"
+      Targets:
+        - Arn: !GetAtt RestoreTestingValidationLambda.Arn
+          Id: "RestoreTestingValidationFunction"
+

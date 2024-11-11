@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template should be deployed in the AWS Organizations management account to delegate backup policy management to the solution account.
+
+Parameters:
+  SolutionHomeAccountId:
+    Description: The solution home AWS Account ID where CodePipeline is deployed
+    Type: String
+  pOrganizationId:
+    Type: String
+    Description: This is the AWS Organization ID value.
+    AllowedPattern: '^o-[a-zA-Z0-9]{10,32}$'
+    ConstraintDescription: >
+      The Organization ID starts with o-, followed by 10 to 32 alphanumeric characters, allowing both lowercase and uppercase letters as well as digits.
+  pOrganizationRootId:
+    Type: String
+    Description: This is the AWS Organization Root ID value.
+    AllowedPattern: '^r-[a-zA-Z0-9-]{2,30}$'
+    ConstraintDescription: >
+      The AWS Organizations root ID starts with r-, followed by alphanumeric characters and hyphens, with a total length of 4 to 32 characters.
+
+  # Parameters for tagging
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default: Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default: '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    ConstraintDescription: Must be a valid environment.
+    Default: Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default: selfserviceservicecatalog@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default: Example Application
+
+Resources:
+  DelegateBackupPolicyMgmt:
+    Type: AWS::Organizations::ResourcePolicy
+    Properties:
+      Content:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DelegatingNecessaryDescribeListActions
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${SolutionHomeAccountId}:root"
+            Action:
+              - organizations:DescribeOrganization
+              - organizations:DescribeOrganizationalUnit
+              - organizations:DescribeAccount
+              - organizations:ListRoots
+              - organizations:ListOrganizationalUnitsForParent
+              - organizations:ListParents
+              - organizations:ListChildren
+              - organizations:ListAccounts
+              - organizations:ListAccountsForParent
+              - organizations:ListTagsForResource
+            Resource: "*"
+          - Sid: DelegatingNecessaryDescribeListActionsForSpecificPolicyType
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${SolutionHomeAccountId}:root"
+            Action:
+              - organizations:DescribePolicy
+              - organizations:DescribeEffectivePolicy
+              - organizations:ListPolicies
+              - organizations:ListPoliciesForTarget
+              - organizations:ListTargetsForPolicy
+            Resource: "*"
+            Condition:
+              StringLikeIfExists:
+                organizations:PolicyType: BACKUP_POLICY
+          - Sid: DelegatingAllActionsForBackupPolicies
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${SolutionHomeAccountId}:root"
+            Action:
+              - organizations:CreatePolicy
+              - organizations:UpdatePolicy
+              - organizations:DeletePolicy
+              - organizations:AttachPolicy
+              - organizations:DetachPolicy
+              - organizations:EnablePolicyType
+              - organizations:DisablePolicyType
+              - organizations:TagResource
+              - organizations:UntagResource
+            Resource:
+              - !Sub "arn:aws:organizations::${AWS::AccountId}:root/${pOrganizationId}/${pOrganizationRootId}"
+              - !Sub "arn:aws:organizations::${AWS::AccountId}:ou/${pOrganizationId}/*"
+              - !Sub "arn:aws:organizations::${AWS::AccountId}:account/${pOrganizationId}/*"
+              - !Sub "arn:aws:organizations::${AWS::AccountId}:policy/${pOrganizationId}/backup_policy/*"
+            Condition:
+              StringLikeIfExists:
+                organizations:PolicyType: BACKUP_POLICY
+
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner

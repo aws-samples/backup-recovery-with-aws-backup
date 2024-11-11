@@ -1,0 +1,198 @@
+Description: "StackSet for Backup and Recovery with AWS Backup Member Account Resources(Config,Framework)"
+Parameters:
+  StackSetName:
+    Description: Name of the stackset
+    Type: String
+    Default: "organizations-aws-backup-member-account-config-framework"
+
+  StackSetS3BucketName:
+    Description: Name of S3 bucket where stackset templates are stored.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/bucket"
+
+  StackSetTemplate:
+    Description: Name of stackset template
+    Type: String
+    Default: "deployment/cloudformation/stacks/aws-backup-member-account-config-framework.yaml"
+
+  StackSetDescription:
+    Description: Description for StackSet
+    Type: String
+    Default: "StackSet for Backup and Recovery with AWS Backup Member Account Resources(Config,Framework)"
+
+  StackSetTargetOUsParameterStore:
+    Description: Target organization unit ids
+    Type: AWS::SSM::Parameter::Value<CommaDelimitedList>
+    Default: "/backup/target/organizational-units"
+
+  StackSetTargetRegionsParameterStore:
+    Description: Target regions
+    Type: AWS::SSM::Parameter::Value<CommaDelimitedList>
+    Default: "/backup/target/regions"
+
+  # Parameters for stack
+  DeployControl1:
+    Description: 'Do you want to evaluates if resources are included in at least one backup plan?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/control1"
+  DeployControl2:
+    Description: 'Do you want to evaluates if backup frequency is at least x day and retention period is at least y days?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/control2"
+  DeployControl3:
+    Description: 'Do you want to evaluates if backup vaults do not allow manual deletion of recovery points except by certain AWS Identity and Access Management (IAM) roles?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/control3"
+  DeployControl4:
+    Description: 'Do you want to evaluates if the recovery points are encrypted?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/control4"
+  DeployControl5:
+    Description: 'Do you want to Evaluates if the recovery point retention period is at least x days?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/control5"
+  DeployControl6:
+    Description: 'Do you want to ealuates if a resource is configured to create copies of its backups to another AWS Region?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/control6"
+  DeployControl7:
+    Description: 'Do you want to evaluates if a resource has a cross-account backup copy configured?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/control7"
+  DeployControl8:
+    Description: 'Do you want to evaluates if a resource is configured to have backups in locked backup vault?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/control8"
+  DeployControl9:
+    Description: 'Do you want to evaluates if a recovery point was created within specified time frame?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/control9"
+  DeployControl10:
+    Description: 'Do you want to evaluates if restore testing job completed within target restore time?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/control10"
+  DeployConfigurationRecorder:
+    Description: 'Do you want to configure a Configuration Recorders for each region you use?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/configurationrecorder"
+
+  # Parameters for tagging
+  CommitId:
+    Description: The commit id for the change
+    Type: String
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+    - Marketing
+    - Engineering
+    - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default: Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default: '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+    - Development
+    - QA
+    - Production
+    ConstraintDescription: Must be a valid environment.
+    Default: Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default: selfserviceservicecatalog@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default: Example Application
+
+
+Resources:
+  StackSetDeployment:
+    Type: AWS::CloudFormation::StackSet
+    Properties:
+      StackSetName: !Ref StackSetName
+      #      TemplateBody: String
+      TemplateURL: !Sub "https://s3.amazonaws.com/${StackSetS3BucketName}/${StackSetTemplate}"
+      AutoDeployment:
+        Enabled: true
+        RetainStacksOnAccountRemoval: false
+      CallAs: DELEGATED_ADMIN
+      Capabilities:
+      - CAPABILITY_NAMED_IAM
+      Description: !Ref StackSetDescription
+      OperationPreferences:
+        FailureToleranceCount: 0
+        #        FailureTolerancePercentage: Integer
+        MaxConcurrentCount: 2
+        #        MaxConcurrentPercentage: Integer
+        RegionConcurrencyType: SEQUENTIAL
+        #        RegionOrder:
+        #          - String
+      PermissionModel: SERVICE_MANAGED
+      StackInstancesGroup:
+      - DeploymentTargets:
+          #            Accounts: !Ref StackSetTargetAccounts
+          OrganizationalUnitIds: !Ref StackSetTargetOUsParameterStore
+          #          ParameterOverrides:
+          #            - Parameter
+        Regions: !Ref StackSetTargetRegionsParameterStore
+      Parameters:
+      - ParameterKey: DeployControl1
+        ParameterValue: !Ref DeployControl1
+      - ParameterKey: DeployControl2
+        ParameterValue: !Ref DeployControl2
+      - ParameterKey: DeployControl3
+        ParameterValue: !Ref DeployControl3
+      - ParameterKey: DeployControl4
+        ParameterValue: !Ref DeployControl4
+      - ParameterKey: DeployControl5
+        ParameterValue: !Ref DeployControl5
+      - ParameterKey: DeployControl6
+        ParameterValue: !Ref DeployControl6
+      - ParameterKey: DeployControl7
+        ParameterValue: !Ref DeployControl7
+      - ParameterKey: DeployControl8
+        ParameterValue: !Ref DeployControl8
+      - ParameterKey: DeployControl9
+        ParameterValue: !Ref DeployControl9
+      - ParameterKey: DeployControl10
+        ParameterValue: !Ref DeployControl10
+      - ParameterKey: DeployConfigurationRecorder
+        ParameterValue: !Ref DeployConfigurationRecorder
+
+      - ParameterKey: Application
+        ParameterValue: !Ref Application
+      - ParameterKey: BusinessUnit
+        ParameterValue: !Ref BusinessUnit
+      - ParameterKey: CostCenter
+        ParameterValue: !Ref CostCenter
+      - ParameterKey: Environment
+        ParameterValue: !Ref Environment
+      - ParameterKey: ApplicationOwner
+        ParameterValue: !Ref ApplicationOwner
+      - ParameterKey: CommitId
+        ParameterValue: !Ref CommitId
+
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner

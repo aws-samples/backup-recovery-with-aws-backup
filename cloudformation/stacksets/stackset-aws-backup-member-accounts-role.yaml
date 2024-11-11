@@ -1,0 +1,140 @@
+Description: "StackSet for Backup and Recovery with AWS Backup Member Account Role"
+Parameters:
+  StackSetName:
+    Description: Name of the stackset
+    Type: String
+    Default: "organizations-aws-backup-member-accounts-role"
+
+  StackSetS3BucketName:
+    Description: Name of S3 bucket where stackset templates are stored.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/bucket"
+
+  StackSetTemplate:
+    Description: Name of stackset template
+    Type: String
+    Default: "deployment/cloudformation/stacks/aws-backup-member-account-role.yaml"
+
+  StackSetDescription:
+    Description: Description for StackSet
+    Type: String
+    Default: "StackSet for Backup and Recovery with AWS Backup Member Account AWS Backup Role"
+
+  StackSetTargetOUsParameterStore:
+    Description: Target organization unit ids
+    Type: AWS::SSM::Parameter::Value<CommaDelimitedList>
+    Default: "/backup/target/organizational-units"
+
+  StackSetTargetRegionParameterStore:
+    Description: Target regions
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/target/global-region"
+
+  # Parameters for stack
+  DeployConfigurationRecorder:
+    Description: 'Do you want to configure a Configuration Recorders for each region you use?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/configurationrecorder"
+
+  # Parameters for tagging
+  CommitId:
+    Description: The commit id for the change
+    Type: String
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+    - Marketing
+    - Engineering
+    - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default: Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default: '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+    - Development
+    - QA
+    - Production
+    ConstraintDescription: Must be a valid environment.
+    Default: Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default: selfserviceservicecatalog@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default: Example Application
+
+
+
+Resources:
+  StackSetDeployment:
+    Type: AWS::CloudFormation::StackSet
+    Properties:
+      StackSetName: !Ref StackSetName
+      #      TemplateBody: String
+      TemplateURL: !Sub "https://s3.amazonaws.com/${StackSetS3BucketName}/${StackSetTemplate}"
+      AutoDeployment:
+        Enabled: true
+        RetainStacksOnAccountRemoval: false
+      CallAs: DELEGATED_ADMIN
+      Capabilities:
+      - CAPABILITY_NAMED_IAM
+      Description: !Ref StackSetDescription
+      OperationPreferences:
+        FailureToleranceCount: 0
+        #        FailureTolerancePercentage: Integer
+        MaxConcurrentCount: 1
+        #        MaxConcurrentPercentage: Integer
+        RegionConcurrencyType: SEQUENTIAL
+        #        RegionOrder:
+        #          - String
+      PermissionModel: SERVICE_MANAGED
+      StackInstancesGroup:
+      - DeploymentTargets:
+          #            Accounts: !Ref StackSetTargetAccounts
+          OrganizationalUnitIds: !Ref StackSetTargetOUsParameterStore
+          #          ParameterOverrides:
+          #            - Parameter
+        Regions:
+        - !Ref StackSetTargetRegionParameterStore
+      Parameters:
+      - ParameterKey: DeployConfigurationRecorder
+        ParameterValue: !Ref DeployConfigurationRecorder
+
+      - ParameterKey: Application
+        ParameterValue: !Ref Application
+      - ParameterKey: BusinessUnit
+        ParameterValue: !Ref BusinessUnit
+      - ParameterKey: CostCenter
+        ParameterValue: !Ref CostCenter
+      - ParameterKey: Environment
+        ParameterValue: !Ref Environment
+      - ParameterKey: ApplicationOwner
+        ParameterValue: !Ref ApplicationOwner
+      - ParameterKey: CommitId
+        ParameterValue: !Ref CommitId
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+

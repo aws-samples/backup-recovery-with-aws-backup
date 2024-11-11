@@ -1,0 +1,243 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform:
+- 'AWS::LanguageExtensions'
+Description: This template deploys AWS Organization Backup Policies to manage backups at an organization level. It should be deployed in the AWS Organizations management account or from an AWS Account with delegated Administrator permissions.
+
+Parameters:
+  pOrgBackupTargetOUs:
+    Description: A comma separated list of the AWS Organizations OUs to attach backup policies.
+    Type: AWS::SSM::Parameter::Value<CommaDelimitedList>
+    Default: "/backup/target/organizational-units"
+  pRegions:
+    Description: Target regions for backup plans as a comma delimited list
+    Type: AWS::SSM::Parameter::Value<CommaDelimitedList>
+    Default: "/backup/target/regions"
+  pCentralBackupVaultArn:
+    Description: The ARN of a centralized AWS Backup Vault that will be the secondary store for all AWS Backups.  The defined organization backup policy plans will "copy_to" this vault.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/central-vault-arn"
+  pCrossAccountBackupRole:
+    Description: This is the IAM role name for the cross-account backup role that carries out the backup activities.
+    Type: String
+    Default: AWSBackupSolutionRole
+  DailyBackupSchedule:
+    Description: The CRON job to initiate backup jobs. For example, cron(0 5 ? * * *) for daily, every day at 05:00 UTC.
+    Type: String
+    Default: cron(0 5 ? * * *)
+  MonthlyBackupSchedule:
+    Description: The CRON job to initiate backup jobs. For example, cron(0 5 1 * ? *) for monthly, first day of month at midnight UTC.
+    Type: String
+    Default: cron(0 5 1 * ? *)
+  pMemberAccountBackupVault:
+    AllowedPattern: ^[a-zA-Z0-9\-\_\.]{1,50}$
+    ConstraintDescription: The name of the member account Backup vaults. (Name is case sensitive).
+    Type: String
+    Default: AWSBackupSolutionVault
+  pBackupTagKey1:
+    Type: String
+    Description: The backup tag key to automatically assign resources to a backup plan across the member accounts.
+    Default: 'backup'
+  pBackupTagValue1:
+    Type: String
+    Description: The backup tag value to automatically assign resources to a backup plan across the member accounts.
+    Default: 'daily'
+  pBackupTagKey2:
+    Type: String
+    Description: The backup tag key to automatically assign resources to a backup plan across the member accounts.
+    Default: 'backup'
+  pBackupTagValue2:
+    Type: String
+    Description: The backup tag value to automatically assign resources to a backup plan across the member accounts.
+    Default: 'monthly'
+  pTagKey:
+    Type: String
+    Description: This is the tag key to assign to resources.
+    Default: 'project'
+  pTagValue:
+    Type: String
+    Description: This is the tag value to assign to resources.
+    Default: 'aws-backup'
+
+  # Parameters for tagging
+  CommitId:
+    Description: The commit id for the change
+    Type: String
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+    - Marketing
+    - Engineering
+    - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default: Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default: '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+    - Development
+    - QA
+    - Production
+    ConstraintDescription: Must be a valid environment.
+    Default: Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default: selfserviceservicecatalog@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default: Example Application
+
+Resources:
+  rOrgDailyBackUpPolicy:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: org-daily-backup-policy
+      Description: >-
+        BackupPolicy for Daily Backup as per the resource selection criteria
+      Type: BACKUP_POLICY
+      TargetIds: !Ref pOrgBackupTargetOUs
+      Content:
+        Fn::ToJsonString:
+          plans:
+            OrgBackupPlanDaily:
+              rules:
+                OrgDailyBackupRule:
+                  schedule_expression:
+                    "@@assign": !Ref DailyBackupSchedule
+                  start_backup_window_minutes:
+                    "@@assign": '60'
+                  complete_backup_window_minutes:
+                    "@@assign": '1200'
+                  lifecycle:
+                    delete_after_days:
+                      "@@assign": '35'
+                  target_backup_vault_name:
+                    "@@assign": !Ref pMemberAccountBackupVault
+                  recovery_point_tags:
+                    project:
+                      tag_key:
+                        "@@assign": !Ref pTagKey
+                      tag_value:
+                        "@@assign": !Ref pTagValue
+                  copy_actions:
+                    # Currently this must be hardcoded since [AWS Backup Policy syntax](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_backup_syntax.html#backup-policy-syntax-reference) requires the name of this key to be the same as the target.
+                    <Replace with value from pCentralBackupVaultArn>:
+                      target_backup_vault_arn:
+                        "@@assign": !Ref pCentralBackupVaultArn
+                      lifecycle:
+                        delete_after_days:
+                          "@@assign": '35'
+              backup_plan_tags:
+                project:
+                  tag_key:
+                    "@@assign": !Ref pTagKey
+                  tag_value:
+                    "@@assign": !Ref pTagValue
+              regions:
+                "@@append": !Ref pRegions
+              selections:
+                tags:
+                  OrgDailyBackupSelection:
+                    iam_role_arn:
+                      "@@assign": !Sub 'arn:aws:iam::$account:role/${pCrossAccountBackupRole}'
+                    tag_key:
+                      "@@assign": !Ref pBackupTagKey1
+                    tag_value:
+                      "@@assign":
+                      - !Ref pBackupTagValue1
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+
+
+  rOrgMonthlyBackUpPolicy:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: org-monthly-backup-policy
+      Description: >-
+        BackupPolicy for Monthly Backup as per the resource selection criteria
+      Type: BACKUP_POLICY
+      TargetIds: !Ref pOrgBackupTargetOUs
+      Content:
+        Fn::ToJsonString:
+          plans:
+            OrgBackupPlanMonthly:
+              rules:
+                OrgMonthlyBackupRule:
+                  schedule_expression:
+                    "@@assign": !Ref MonthlyBackupSchedule
+                  start_backup_window_minutes:
+                    "@@assign": '60'
+                  complete_backup_window_minutes:
+                    "@@assign": '1200'
+                  lifecycle:
+                    delete_after_days:
+                      "@@assign": '366'
+                  target_backup_vault_name:
+                    "@@assign": !Ref pMemberAccountBackupVault
+                  recovery_point_tags:
+                    project:
+                      tag_key:
+                        "@@assign": !Ref pTagKey
+                      tag_value:
+                        "@@assign": !Ref pTagValue
+                  copy_actions:
+                    # Currently this must be hardcoded since [AWS Backup Policy syntax](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_backup_syntax.html#backup-policy-syntax-reference) requires the name of this key to be the same as the target.
+                    <Replace with value from pCentralBackupVaultArn>:
+                      target_backup_vault_arn:
+                        "@@assign": !Ref pCentralBackupVaultArn
+                      lifecycle:
+                        delete_after_days:
+                          "@@assign": '366'
+              backup_plan_tags:
+                project:
+                  tag_key:
+                    "@@assign": !Ref pTagKey
+                  tag_value:
+                    "@@assign": !Ref pTagValue
+              regions:
+                "@@append": !Ref pRegions
+              selections:
+                tags:
+                  OrgDailyBackupSelection:
+                    iam_role_arn:
+                      "@@assign": !Sub "arn:aws:iam::$account:role/${pCrossAccountBackupRole}"
+                    tag_key:
+                      "@@assign": !Ref pBackupTagKey2
+                    tag_value:
+                      "@@assign":
+                      - !Ref pBackupTagValue2
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+

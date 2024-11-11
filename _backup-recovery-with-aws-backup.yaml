@@ -1,0 +1,1663 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "SSM Parameter for Backup and Recovery with AWS Backup target OUs, Regions, Accounts, and Automation"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: "GitHub Configuration"
+      Parameters:
+      - GitHubRepo
+      - GitHubBranch
+    - Label:
+        default: "GitHub Credentials"
+      Parameters:
+      - GitHubUsername
+      - GitHubPersonalAccessToken
+    - Label:
+        default: "Solution Configuration"
+      Parameters:
+      - OrgId
+      - OrgMgmtAcctId
+      - SolutionHomeOrgUnit
+      - TargetGlobalRegion
+      - TargetRegions
+      - TargetOUs
+    - Label:
+        default: "Central Backup Account Configuration"
+      Parameters:
+      - AWSBackupCentralAccountOU
+      - AWSBackupCentralAccountId
+      - AWSBackupCentralAccountRegion
+    - Label:
+        default: "Restore Testing Configuration - Plan"
+      Parameters:
+      - RestoreTestSchedule
+      - SelectionWindowDays
+      - StartWindowHours
+    - Label:
+        default: "Restore Testing Selection - EC2"
+      Parameters:
+      - RestoreSubnetEC2
+      - RestoreSecurityGroupIdEC2
+      - RestoreValidationHoursEC2
+      - TagKey
+      - TagValue
+    - Label:
+        default: "Customer Specific Tags"
+      Parameters:
+      - BusinessUnit
+      - CostCenter
+      - Environment
+      - ApplicationOwner
+      - Application
+    - Label:
+        default: "AWS Backup Framework Configuration"
+      Parameters:
+      - DeployControl1
+      - DeployControl2
+      - DeployControl3
+      - DeployControl4
+      - DeployControl5
+      - DeployControl6
+      - DeployControl7
+      - DeployControl8
+      - DeployControl9
+      - DeployControl10
+    - Label:
+        default: "AWS Backup Report Configuration"
+      Parameters:
+      - DeployResourceComplianceReportPlan
+      - DeployControlComplianceReportPlan
+      - DeployBackupJobReportPlan
+      - DeployCopyJobReportPlan
+      - DeployRestoreJobReportPlan
+    - Label:
+        default: "Demo Resources"
+      Parameters:
+      - AWSBackupDemoEC2InstanceType
+      - AWSBackupDemoVPCCIDR
+      - AWSBackupDemoSubnetCIDR
+      - AWSBackupDemoTagKey
+      - AWSBackupDemoTagValue
+    - Label:
+        default: "AWS Config Configuration Recorder"
+      Parameters:
+      - DeployConfigurationRecorder
+
+    ParameterLabels:
+      GitHubRepo:
+        default: "GitHub Repository"
+      GitHubBranch:
+        default: "GitHub Branch"
+      GitHubUsername:
+        default: "GitHub Username"
+      GitHubPersonalAccessToken:
+        default: "GitHub Personal Access Token"
+      OrgId:
+        default: "AWS Organization ID"
+      OrgMgmtAcctId:
+        default: "AWS Organization Management Account ID"
+      SolutionHomeOrgUnit:
+        default: "Solution Home Organizational Unit (OU)"
+      TargetGlobalRegion:
+        default: "Target Global Region"
+      TargetRegions:
+        default: "Target Regions"
+      TargetOUs:
+        default: "Target Organizational Units (OUs)"
+      AWSBackupCentralAccountOU:
+        default: "AWS Backup Central Account OU"
+      AWSBackupCentralAccountId:
+        default: "AWS Backup Central Account ID"
+      AWSBackupCentralAccountRegion:
+        default: "AWS Backup Central Account Region"
+      BusinessUnit:
+        default: "Business Unit"
+      CostCenter:
+        default: "Cost Center"
+      Environment:
+        default: "Environment"
+      ApplicationOwner:
+        default: "Application Owner"
+      Application:
+        default: "Application Name"
+      RestoreTestSchedule:
+        default: "Restore Test Schedule (CRON)"
+      RestoreSubnetEC2:
+        default: "Restore Subnet for EC2"
+      RestoreSecurityGroupIdEC2:
+        default: "Restore Security Group ID to use for EC2"
+      RestoreValidationHoursEC2:
+        default: "Restore Validation Duration Time (Hours)"
+      SelectionWindowDays:
+        default: "Recovery Points Selection Window (Days)"
+      StartWindowHours:
+        default: "Restore Testing Start Window (Hours)"
+      TagKey:
+        default: "Resource Point Selection Tag Key"
+      TagValue:
+        default: "Resource Point Selection Tag Value"
+
+      AWSBackupDemoEC2InstanceType:
+        default: "Demo EC2 Instance Type"
+      AWSBackupDemoVPCCIDR:
+        default: "Demo VPC CIDR Block"
+      AWSBackupDemoSubnetCIDR:
+        default: "Demo Subnet CIDR Block"
+      AWSBackupDemoTagKey:
+        default: "Tag Key for AWS Backup"
+      AWSBackupDemoTagValue:
+        default: "Tag Value for AWS Backup"
+
+      DeployControl1:
+        default: "Control #1-Backup resources are included in at least one backup plan"
+      DeployControl2:
+        default: "Control #2-Backup plan has minimum frequency and minimum retention"
+      DeployControl3:
+        default: "Control #3-Vaults prevent manual deletion of recovery points"
+      DeployControl4:
+        default: "Control #4-Recovery points are encrypted"
+      DeployControl5:
+        default: "Control #5-Minimum retention established for recovery point"
+      DeployControl6:
+        default: "Control #6-Cross-Region backup copy is scheduled"
+      DeployControl7:
+        default: "Control #7-Cross-account backup copy is scheduled"
+      DeployControl8:
+        default: "Control #8-Backups are protected by AWS Backup Vault Lock"
+      DeployControl9:
+        default: "Control #9-Last recovery point was created"
+      DeployControl10:
+        default: "Control #10-Restore time for resources meet target"
+
+      DeployResourceComplianceReportPlan:
+        default: "Report Plan #1-RESOURCE_COMPLIANCE_REPORT"
+      DeployControlComplianceReportPlan:
+        default: "Report Plan #2-CONTROL_COMPLIANCE_REPORT"
+      DeployBackupJobReportPlan:
+        default: "Report Plan #3-BACKUP_JOB_REPORT"
+      DeployCopyJobReportPlan:
+        default: "Report Plan #4-COPY_JOB_REPORT"
+      DeployRestoreJobReportPlan:
+        default: "Report Plan #5-RESTORE_JOB_REPORT"
+
+      DeployConfigurationRecorder:
+        default: "Auto-configuration of AWS Config Configuration Recorder"
+
+Parameters:
+  GitHubRepo:
+    Description: The forked solution GitHub repository name
+    Type: String
+    Default: "backup-recovery-with-aws-backup"
+  GitHubBranch:
+    Description: Your repository branch to use
+    Type: String
+    Default: "main"
+
+  GitHubUsername:
+    Description: Your GitHub Username containing the forked solution repository.
+    Type: String
+  GitHubPersonalAccessToken:
+    Description: Your GitHub Personal Access Token you generated for CodePipeline integration
+    Type: String
+    NoEcho: true # Ensures the value is hidden in the AWS Console and outputs
+
+  OrgId:
+    Description: The AWS Organizations ID where backup policies will be administered
+    Type: String
+
+  OrgMgmtAcctId:
+    Description: The AWS Organizations Management Account ID where backup policies will be administered
+    Type: String
+
+  SolutionHomeOrgUnit:
+    Description: The AWS Organizational Unit (OU) in which this solution home account lives
+    Type: String
+
+  TargetGlobalRegion:
+    Description: Target region for global resources
+    Type: String
+  TargetRegions:
+    Description: Comma separated list of regions that you want to configure for backup
+    Type: String
+  TargetOUs:
+    Description: A comma separated list of OUs whose accounts you want to configure for backup
+    Type: String
+
+  AWSBackupCentralAccountOU:
+    Type: String
+    Description: The AWS OU for the central account that will be the secondary store for all accounts / regions. Secondary copies and restore testing will be in the selected account within this OU.
+  AWSBackupCentralAccountId:
+    Type: String
+    Description: The AWS Account ID for the central account that will be the secondary store for all AWS Backups. Secondary copies and restore testing will be in this account.
+  AWSBackupCentralAccountRegion:
+    Type: String
+    Description: The region for the central account that will be the secondary store for all AWS Backups. Secondary copies and restore testing will be in this region.
+
+  RestoreTestSchedule:
+    Description: The CRON job to initiate restore test plan. For example, cron(0 7 ? * 6 *) weekly on Saturday, at 07:00 UTC.
+    Type: String
+    Default: cron(0 7 ? * 6 *)
+  RestoreSubnetEC2:
+    Description: The restore subnet for EC2 restore testing.
+    Type: String
+  RestoreSecurityGroupIdEC2:
+    Description: The restore security group IDs for EC2 restore testing.
+    Type: String
+  RestoreValidationHoursEC2:
+    Description: The number of hours to keep the EC2 instance active for restore validation.
+    Type: String
+    Default: 1
+  SelectionWindowDays:
+    Description: The number of days to select recovery points.
+    Type: Number
+    Default: 365
+  StartWindowHours:
+    Description: The number of hours for the restore testing start window.
+    Type: Number
+    Default: 1
+  TagKey:
+    Description: The tag key used for selecting resources. For example, "backup".
+    Type: String
+    Default: "backup"
+  TagValue:
+    Description: The tag value used for selecting resources. For example, "daily".
+    Type: String
+    Default: "daily"
+  AWSBackupDemoEC2InstanceType:
+    Description: The instance type for demo EC2 instances
+    Type: String
+    Default: "t3.nano" # Replace with your default value or remove Default to require user input
+  AWSBackupDemoVPCCIDR:
+    Description: The CIDR for demo VPC
+    Type: String
+    Default: "10.0.0.0/16" # Replace with your default value or remove Default to require user input
+  AWSBackupDemoSubnetCIDR:
+    Description: The CIDR for demo subnet
+    Type: String
+    Default: "10.0.1.0/24" # Replace with your default value or remove Default to require user input
+  AWSBackupDemoTagKey:
+    Description: The tag key to apply to demo resources - align to AWS Backup policy
+    Type: String
+    Default: "backup" # Replace with your default value or remove Default to require user input
+  AWSBackupDemoTagValue:
+    Description: The tag value to apply to demo resources - align to AWS Backup policy
+    Type: String
+    Default: "daily" # Replace with your default value or remove Default to require user input
+
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+    - Marketing
+    - Engineering
+    - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default: Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default: '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+    - development
+    - qa
+    - production
+    ConstraintDescription: Must be a valid environment
+    Default: development
+  ApplicationOwner:
+    Description: Email address of the application owner
+    Type: String
+    Default: someone@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default: Backup and Recovery with AWS Backup
+  DeployControl1:
+    Description: 'Do you want to evaluates if resources are included in at least one backup plan?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployControl2:
+    Description: 'Do you want to evaluates if backup frequency is at least x day and retention period is at least y days?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployControl3:
+    Description: 'Do you want to evaluates if backup vaults do not allow manual deletion of recovery points except by certain AWS Identity and Access Management (IAM) roles?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: no
+  DeployControl4:
+    Description: 'Do you want to evaluates if the recovery points are encrypted?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployControl5:
+    Description: 'Do you want to Evaluates if the recovery point retention period is at least x days?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployControl6:
+    Description: 'Do you want to ealuates if a resource is configured to create copies of its backups to another AWS Region?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: no
+  DeployControl7:
+    Description: 'Do you want to evaluates if a resource has a cross-account backup copy configured?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployControl8:
+    Description: 'Do you want to evaluates if a resource is configured to have backups in locked backup vault?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: no
+  DeployControl9:
+    Description: 'Do you want to evaluates if a recovery point was created within specified time frame?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployControl10:
+    Description: 'Do you want to evaluates if restore testing job completed within target restore time?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: no
+
+  DeployResourceComplianceReportPlan:
+    Description: 'Do you want to create a Resource Compliance Report Plan?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployControlComplianceReportPlan:
+    Description: 'Do you want to create a Control Compliance Report Plan?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployBackupJobReportPlan:
+    Description: 'Do you want to create a Backup Job Report Plan?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployCopyJobReportPlan:
+    Description: 'Do you want to create a Copy Job Report Plan?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployRestoreJobReportPlan:
+    Description: 'Do you want to create a Restore Job Report Plan?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+  DeployConfigurationRecorder:
+    Description: 'Do you want to configure a Configuration Recorders for each region you use. If you select false, you must configure one Configuration Recorder for each region that you use manually.'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
+
+Resources:
+  AWSBackupOrgId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The AWS Organizations ID where backup policies will be administered.
+      Name: "/backup/org-id"
+      Type: String
+      Value: !Ref OrgId
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupBucket:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: S3 bucket used to store source artifacts for Backup and Recovery with AWS Backup solution.
+      Name: "/backup/bucket"
+      Type: String
+      Value: !Ref DeploymentBucket
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+
+  AWSBackupSolutionOrgUnit:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "AWS Solution AWS Organizations Unit for Backup and Recovery with AWS Backup solution"
+      Name: "/backup/solution-ou"
+      Type: String
+      Value: !Ref SolutionHomeOrgUnit
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupCentralAccountOUSSM:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "The AWS OU for the central account that will be the secondary store for all AWS Backups.  Secondary copies and restore testing will be in an account within this OU"
+      Name: "/backup/central-account-ou"
+      Type: String
+      Value: !Ref AWSBackupCentralAccountOU
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupCentralAccountIdSSM:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "The AWS Account ID for the central account that will be the secondary store for all AWS Backups.  Secondary copies and restore testing will be in this account."
+      Name: "/backup/central-account-id"
+      Type: String
+      Value: !Ref AWSBackupCentralAccountId
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupCentralAccountRegionSSM:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "The region for the central account that will be the secondary store for all AWS Backups.  Secondary copies and restore testing will be in this region."
+      Name: "/backup/central-account-region"
+      Type: String
+      Value: !Ref AWSBackupCentralAccountRegion
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupCentralVaultSSM:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "The ARN for the Central Backup Vault that will be the secondary store for all AWS Backups."
+      Name: "/backup/central-vault-arn"
+      Type: String
+      Value: !Sub "arn:aws:backup:${AWSBackupCentralAccountRegion}:${AWSBackupCentralAccountId}:backup-vault:AWSBackupSolutionCentralVault"
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+
+  RestoreTestScheduleParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The CRON job to initiate restore test plan.
+      Name: "/backup/testing/restore-test-schedule"
+      Type: String
+      Value: !Ref RestoreTestSchedule
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  RestoreSubnetEC2Parameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The restore subnet for EC2 restore testing.
+      Name: "/backup/testing/ec2/subnetId"
+      Type: String
+      Value: !Ref RestoreSubnetEC2
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  RestoreSecurityGroupIdEC2Parameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The restore security group IDs for EC2 restore testing.
+      Name: "/backup/testing/ec2/securityGroupIds"
+      Type: String
+      Value: !Ref RestoreSecurityGroupIdEC2
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  RestoreValidationHoursEC2Parameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The number of hours to keep the EC2 instance active for restore testing validation.
+      Name: "/backup/testing/ec2/validation-window-hours"
+      Type: String
+      Value: !Ref RestoreValidationHoursEC2
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  SelectionWindowDaysParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The number of days to select recovery points.
+      Name: "/backup/testing/selection-window-days"
+      Type: String
+      Value: !Ref SelectionWindowDays
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  StartWindowHoursParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The number of hours for the restore testing start window.
+      Name: "/backup/testing/start-window-hours"
+      Type: String
+      Value: !Ref StartWindowHours
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  TagKeyParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The tag key used for selecting resources.
+      Name: "/backup/testing/ec2/tag-key"
+      Type: String
+      Value: !Ref TagKey
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  TagValueParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The tag value used for selecting resources.
+      Name: "/backup/testing/ec2/tag-value"
+      Type: String
+      Value: !Ref TagValue
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+
+  AWSBackupTargetGlobalRegion:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: !Sub "Target region for global resources for Backup and Recovery with AWS Backup solution"
+      Name: "/backup/target/global-region"
+      Type: String
+      Value: !Ref AWS::Region
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupTargetRegions:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: !Sub "Target regions for Backup and Recovery with AWS Backup solution"
+      Name: "/backup/target/regions"
+      Type: StringList
+      Value: !Ref TargetRegions
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupTargetOUs:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Target OUs for Backup and Recovery with AWS Backup solution"
+      Name: "/backup/target/organizational-units"
+      Type: StringList
+      Value: !Ref TargetOUs
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupFrameworkControl1:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to evaluates if resources are included in at least one backup plan?"
+      Name: "/backup/control1"
+      Type: String
+      Value: !Ref DeployControl1
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  DemoEC2InstanceType:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The instance type for demo EC2 instances
+      Name: "/backup/demo/ec2-instance-type"
+      Type: String
+      Value: !Ref AWSBackupDemoEC2InstanceType
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  DemoVPCCIDR:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The CIDR for the demo VPC
+      Name: "/backup/demo/vpc-cidr"
+      Type: String
+      Value: !Ref AWSBackupDemoVPCCIDR
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  DemoSubnetCIDR:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The CIDR for demo subnet
+      Name: "/backup/demo/subnet-cidr"
+      Type: String
+      Value: !Ref AWSBackupDemoSubnetCIDR
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  DemoTagKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The tag key to apply to demo resources - align to AWS Backup policy
+      Name: "/backup/demo/tag-key"
+      Type: String
+      Value: !Ref AWSBackupDemoTagKey
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  DemoTagValue:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: The tag value to apply to demo resources - align to AWS Backup policy
+      Name: "/backup/demo/tag-value"
+      Type: String
+      Value: !Ref AWSBackupDemoTagValue
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupFrameworkControl2:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to evaluate if backup frequency is at least x day and retention period is at least y days?"
+      Name: "/backup/control2"
+      Type: String
+      Value: !Ref DeployControl2
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupFrameworkControl3:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to evaluates if backup vaults do not allow manual deletion of recovery points except by certain AWS Identity and Access Management (IAM) roles?"
+      Name: "/backup/control3"
+      Type: String
+      Value: !Ref DeployControl3
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupFrameworkControl4:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to evaluates if the recovery points are encrypted?"
+      Name: "/backup/control4"
+      Type: String
+      Value: !Ref DeployControl4
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupFrameworkControl5:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to Evaluates if the recovery point retention period is at least x days?"
+      Name: "/backup/control5"
+      Type: String
+      Value: !Ref DeployControl5
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupFrameworkControl6:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to ealuates if a resource is configured to create copies of its backups to another AWS Region?"
+      Name: "/backup/control6"
+      Type: String
+      Value: !Ref DeployControl6
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupFrameworkControl7:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to evaluates if a resource has a cross-account backup copy configured?"
+      Name: "/backup/control7"
+      Type: String
+      Value: !Ref DeployControl7
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupFrameworkControl8:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to evaluates if a resource is configured to have backups in locked backup vault?"
+      Name: "/backup/control8"
+      Type: String
+      Value: !Ref DeployControl8
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupFrameworkControl9:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to evaluates if a recovery point was created within specified time frame?"
+      Name: "/backup/control9"
+      Type: String
+      Value: !Ref DeployControl9
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  AWSBackupFrameworkControl10:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to evaluates if restore testing job completed within target restore time?"
+      Name: "/backup/control10"
+      Type: String
+      Value: !Ref DeployControl10
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  ResourceComplianceReportPlan:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to create a Resource Compliance Report Plan?"
+      Name: "/backup/backupplan1"
+      Type: String
+      Value: !Ref DeployResourceComplianceReportPlan
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  ControlComplianceReportPlan:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to create a Control Compliance Report Plan?"
+      Name: "/backup/backupplan2"
+      Type: String
+      Value: !Ref DeployControlComplianceReportPlan
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  BackupJobReportPlan:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to create a Backup Job Report Plan?"
+      Name: "/backup/backupplan3"
+      Type: String
+      Value: !Ref DeployBackupJobReportPlan
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  CopyJobReportPlan:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to create a Copy Job Report Plan?"
+      Name: "/backup/backupplan4"
+      Type: String
+      Value: !Ref DeployCopyJobReportPlan
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  RestoreJobReportPlan:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to create a Restore Job Report Plan?"
+      Name: "/backup/backupplan5"
+      Type: String
+      Value: !Ref DeployRestoreJobReportPlan
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+  ConfigurationRecorder:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "Do you want to configure a Configuration Recorders for each region you use. If you select false, you must configure one Configuration Recorder for each region that you use manually."
+      Name: "/backup/configurationrecorder"
+      Type: String
+      Value: !Ref DeployConfigurationRecorder
+      Tags:
+        Application: !Ref Application
+        BusinessUnit: !Ref BusinessUnit
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        ApplicationOwner: !Ref ApplicationOwner
+
+
+  DeploymentBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      #      BucketEncryption:
+      #        ServerSideEncryptionConfiguration:
+      #          - ServerSideEncryptionByDefault:
+      #              SSEAlgorithm: aws:kms
+      #              KMSMasterKeyID:
+      #                Fn::ImportValue: <S3 CMK KMS Encryption Key>
+      VersioningConfiguration:
+        Status: Enabled
+      #      LoggingConfiguration:
+      #        DestinationBucketName:
+      #          Fn::ImportValue: !Sub <Destination Log Bucket>
+      #        LogFilePrefix: <Logfile Prefix>
+      LifecycleConfiguration:
+        Rules:
+        - Id: DeleteRule
+          Status: Enabled
+          ExpirationInDays: '90'
+
+  DeploymentBucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref DeploymentBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Id: SSEAndSSLPolicy
+        Statement:
+        - Sid: DenyInsecureConnections
+          Effect: Deny
+          Principal: "*"
+          Action: s3:*
+          Resource:
+          - !Join
+            - ''
+            - - Fn::GetAtt: [DeploymentBucket, Arn]
+              - '/*'
+          Condition:
+            Bool:
+              aws:SecureTransport: 'false'
+        - Sid: DenyS3PublicObjectACL
+          Effect: Deny
+          Principal: "*"
+          Action: s3:PutObjectAcl
+          Resource:
+          - !Join
+            - ''
+            - - Fn::GetAtt: [DeploymentBucket, Arn]
+              - '/*'
+          Condition:
+            StringEqualsIgnoreCaseIfExists:
+              s3:x-amz-acl:
+              - public-read
+              - public-read-write
+              - authenticated-read
+
+        - Sid: ''
+          Effect: Allow
+          Principal: "*"
+          Action:
+          - s3:ListBucket
+          Resource: !GetAtt DeploymentBucket.Arn
+          Condition:
+            ForAnyValue:StringLike:
+              aws:PrincipalOrgPaths:
+              - !Sub "${OrgId}/*"
+
+        - Sid: ''
+          Effect: Allow
+          Principal: "*"
+          Action:
+          - s3:Get*
+          Resource:
+          - !Join
+            - ''
+            - - Fn::GetAtt: [DeploymentBucket, Arn]
+              - '/*'
+          Condition:
+            ForAnyValue:StringLike:
+              aws:PrincipalOrgPaths:
+              - !Sub "${OrgId}/*"
+
+
+  # --- Pipeline Assets
+  # KMS Key for CodePipeline
+  CodePipelineKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub "KMS Key for Backup & Recovery with AWS Backup - Encrypts and decrypts pipeline artifacts and other data"
+      Enabled: true
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: "key-default-1"
+        Statement:
+        - Sid: "Enable IAM User Permissions"
+          Effect: "Allow"
+          Principal:
+            AWS:
+            - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+          Action: 'kms:*'
+          Resource: '*'
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+
+  CreateAMIKmsKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub "alias/aws-backup-codepipeline-kms"
+      TargetKeyId: !Ref CodePipelineKMSKey
+
+
+  # Pipeline definition
+  ProductPipeline:
+    DependsOn:
+    - AWSBackupBucket
+    - AWSBackupSolutionOrgUnit
+    - AWSBackupCentralAccountOUSSM
+    - AWSBackupCentralAccountIdSSM
+    - AWSBackupCentralAccountRegionSSM
+    - AWSBackupTargetGlobalRegion
+    - AWSBackupTargetRegions
+    - AWSBackupTargetOUs
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: backup-recovery-aws-backup
+      DisableInboundStageTransitions:
+        - StageName: DeployBackupOrgPolicy
+          Reason: "Update the aws-backup-org-policy.yaml file with the central vault ARN before org policy deployment"
+      ArtifactStore:
+        Type: S3
+        Location: !Ref DeploymentBucket
+        EncryptionKey:
+          Id: !Ref CodePipelineKMSKey
+          Type: 'KMS'
+      RoleArn:
+        Fn::GetAtt:
+        - CodePipelineManageStepsRole
+        - Arn
+      Stages:
+      - Name: SourceStageGitHub
+        Actions:
+        - InputArtifacts: []
+          Name: Source
+          ActionTypeId:
+            Category: Source
+            Owner: ThirdParty
+            Version: '1'
+            Provider: GitHub
+          Configuration:
+            Owner: !Ref GitHubUsername # The owner of the forked repository
+            Repo: !Ref GitHubRepo # The name of the forked repository
+            Branch: !Ref GitHubBranch # The branch you want to track in the forked repo
+            OAuthToken: !Ref GitHubPersonalAccessToken
+          OutputArtifacts:
+          - Name: SourceArtifacts
+          Namespace: SourceVariables
+      - Name: TestBackupRecoveryWithAWSBackup
+        Actions:
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Static_Analysis
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Version: '1'
+            Provider: CodeBuild
+          Configuration:
+            ProjectName: AWSBackup-ValidateTemplates
+          RunOrder: 1
+      - Name: DeployBackupRecoveryWithAWSBackupAssets
+        Actions:
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Deploy_Templates
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Version: '1'
+            Provider: S3
+          Configuration:
+            BucketName: !Ref DeploymentBucket
+            Extract: true
+            ObjectKey: deployment
+            CannedACL: bucket-owner-full-control
+          RunOrder: 1
+      - Name: DeployCentralAcctResources
+        Actions:
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Deploy_CentralAccountResources
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Version: '1'
+            Provider: CloudFormation
+          Configuration:
+            ActionMode: CREATE_UPDATE
+            StackName: stackset-aws-backup-central-backup-account
+            RoleArn: !GetAtt CloudFormationRole.Arn
+            Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+            TemplatePath: SourceArtifacts::cloudformation/stacksets/stackset-aws-backup-central-backup-account.yaml
+            ParameterOverrides: |
+              {
+                "CommitId": "#{SourceVariables.CommitId}"
+              }
+          RunOrder: 1
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Deploy_RestoreTestPlan
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Version: '1'
+            Provider: CloudFormation
+          Configuration:
+            ActionMode: CREATE_UPDATE
+            StackName: stackset-aws-backup-restore-test-plan
+            RoleArn: !GetAtt CloudFormationRole.Arn
+            Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+            TemplatePath: SourceArtifacts::cloudformation/stacksets/stackset-aws-backup-restore-test-plan.yaml
+            ParameterOverrides: |
+              {
+                "CommitId": "#{SourceVariables.CommitId}"
+              }
+
+          RunOrder: 2
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Deploy_RestoreTestValidation
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Version: '1'
+            Provider: CloudFormation
+          Configuration:
+            ActionMode: CREATE_UPDATE
+            StackName: stackset-aws-backup-restore-test-validation
+            RoleArn: !GetAtt CloudFormationRole.Arn
+            Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+            TemplatePath: SourceArtifacts::cloudformation/stacksets/stackset-aws-backup-restore-test-validation.yaml
+            ParameterOverrides: |
+              {
+                "CommitId": "#{SourceVariables.CommitId}"
+              }
+
+          RunOrder: 3
+      - Name: DeployBackupRecoveryMemberAccounts
+        Actions:
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Deploy_MemberAccountsRole
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Version: '1'
+            Provider: CloudFormation
+          Configuration:
+            ActionMode: CREATE_UPDATE
+            StackName: stackset-aws-backup-member-accounts-role
+            RoleArn: !GetAtt CloudFormationRole.Arn
+            Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+            TemplatePath: SourceArtifacts::cloudformation/stacksets/stackset-aws-backup-member-accounts-role.yaml
+            ParameterOverrides: |
+              {
+                "CommitId": "#{SourceVariables.CommitId}"
+              }
+
+          RunOrder: 1
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Deploy_MemberAccounts
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Version: '1'
+            Provider: CloudFormation
+          Configuration:
+            ActionMode: CREATE_UPDATE
+            StackName: stackset-aws-backup-member-accounts
+            RoleArn: !GetAtt CloudFormationRole.Arn
+            Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+            TemplatePath: SourceArtifacts::cloudformation/stacksets/stackset-aws-backup-member-accounts.yaml
+            ParameterOverrides: |
+              {
+                "CommitId": "#{SourceVariables.CommitId}"
+              }
+
+          RunOrder: 2
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Deploy_MemberAccounts_Config_Framework
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Version: '1'
+            Provider: CloudFormation
+          Configuration:
+            ActionMode: CREATE_UPDATE
+            StackName: stackset-aws-backup-member-accounts-config-framework
+            RoleArn: !GetAtt CloudFormationRole.Arn
+            Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+            TemplatePath: SourceArtifacts::cloudformation/stacksets/stackset-aws-backup-member-accounts-config-framework.yaml
+            ParameterOverrides: |
+              {
+                "CommitId": "#{SourceVariables.CommitId}"
+              }
+
+          RunOrder: 3
+      - Name: DeployBackupOrgPolicy
+        Actions:
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Deploy_BackupOrgPolicy
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Version: '1'
+            Provider: CloudFormation
+          Configuration:
+            ActionMode: REPLACE_ON_FAILURE
+            StackName: aws-backup-org-policy
+            RoleArn: !GetAtt CloudFormationRole.Arn
+            Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+            TemplatePath: SourceArtifacts::cloudformation/stacks/aws-backup-org-policy.yaml
+            ParameterOverrides: |
+              {
+                "CommitId": "#{SourceVariables.CommitId}"
+              }
+          RunOrder: 1
+      - Name: DeployReportPlan
+        Actions:
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Deploy_ReportPlan
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Version: '1'
+            Provider: CloudFormation
+          Configuration:
+            ActionMode: REPLACE_ON_FAILURE
+            StackName: aws-backup-report-plan
+            RoleArn: !GetAtt CloudFormationRole.Arn
+            Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+            TemplatePath: SourceArtifacts::cloudformation/stacks/aws-backup-report-plan.yaml
+            ParameterOverrides: |
+              {
+                "CommitId": "#{SourceVariables.CommitId}"
+              }
+
+          RunOrder: 1
+      - Name: DeployDemoResources
+        Actions:
+          - InputArtifacts:
+              - Name: SourceArtifacts
+            Name: Deploy_DemoResources
+            ActionTypeId:
+              Category: Deploy
+              Owner: AWS
+              Version: '1'
+              Provider: CloudFormation
+            Configuration:
+              ActionMode: REPLACE_ON_FAILURE
+              StackName: stackset-aws-backup-demo-resources
+              RoleArn: !GetAtt CloudFormationRole.Arn
+              Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+              TemplatePath: SourceArtifacts::cloudformation/stacksets/stackset-aws-backup-demo-resources.yaml
+              ParameterOverrides: |
+                {
+                  "CommitId": "#{SourceVariables.CommitId}"
+                }
+            RunOrder: 1
+
+
+
+  CodePipelineManageStepsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: CodePipeline role for moving objects through the build and deploy stages.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: codepipeline.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: CodePipelineManageS3Artifacts
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:PutObjectAcl
+            - s3:GetObjectVersion
+            - s3:GetBucketAcl
+            - s3:GetBucketLocation
+            Resource:
+            - !GetAtt DeploymentBucket.Arn
+            - Fn::Sub:
+              - "${bucketarn}/*"
+              - bucketarn: !GetAtt DeploymentBucket.Arn
+      - PolicyName: codepipeline
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - codebuild:StartBuild
+            - codebuild:StartBuild
+            - codebuild:StopBuild
+            - codebuild:BatchGetProjects
+            - codebuild:BatchGetBuilds
+            - codebuild:ListBuildsForProject
+            Resource:
+            - !GetAtt CodeBuildValidateTemplates.Arn
+          - Effect: Allow
+            Action:
+            - iam:PassRole
+            Resource: !GetAtt CloudFormationRole.Arn
+          - Effect: Allow
+            Action:
+            - cloudformation:CreateStack
+            - cloudformation:DeleteStack
+            - cloudformation:DescribeStacks
+            - cloudformation:DescribeStackEvents
+            - cloudformation:UpdateStack
+            - cloudformation:CreateChangeSet
+            - cloudformation:DeleteChangeSet
+            - cloudformation:DescribeChangeSet
+            - cloudformation:ExecuteChangeSet
+            - cloudformation:SetStackPolicy
+            - cloudformation:ValidateTemplate
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - codebuild:ListBuilds
+            - codebuild:ListProjects
+            - codebuild:ListCuratedEnvironmentImages
+            - codebuild:ListSourceCredentials
+            Resource: "*"
+          - Action:
+            - 'kms:Encrypt'
+            - 'kms:Decrypt'
+            - 'kms:ReEncrypt*'
+            - 'kms:GenerateDataKey*'
+            - 'kms:DescribeKey'
+            Resource: !GetAtt CodePipelineKMSKey.Arn
+            Effect: Allow
+
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+
+
+  CodeBuildValidateTemplates:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: AWSBackup-ValidateTemplates
+      Description: Validate Cloudformation Templates with cfnnag
+      ServiceRole:
+        Fn::GetAtt:
+        - CodeBuildRole
+        - Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      EncryptionKey: !GetAtt CodePipelineKMSKey.Arn
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: codebuild/ValidateTemplates/buildspec-cfnnag.yml
+      TimeoutInMinutes: 10
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: CodeBuild role for static analysis of templates for backup-recovery-with-aws-backup solution.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: codebuild.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: CodeBuildManageS3Artifacts
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:PutObjectAcl
+            - s3:GetObjectVersion
+            - s3:GetBucketAcl
+            - s3:GetBucketLocation
+            Resource:
+            - !GetAtt DeploymentBucket.Arn
+            - Fn::Sub:
+              - "${bucketarn}/*"
+              - bucketarn: !GetAtt DeploymentBucket.Arn
+          - Effect: Allow
+            Action:
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - logs:DescribeLogStreams
+            - logs:CreateLogGroup
+            Resource:
+            - Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*
+          - Action:
+            - 'kms:Encrypt'
+            - 'kms:Decrypt'
+            - 'kms:ReEncrypt*'
+            - 'kms:GenerateDataKey*'
+            - 'kms:DescribeKey'
+            Resource: !GetAtt CodePipelineKMSKey.Arn
+            Effect: Allow
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+
+
+  CloudFormationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudFormationRole
+      Description: Role assumed by CloudFormation for deploying resources
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: cloudformation.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+      Policies:
+      - PolicyName: CloudFormationPermissions
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - iam:*
+            - codepipeline:*
+            - ssm:*
+            - s3:*
+            - backup:*
+            - secretsmanager:GetSecretValue
+            - lambda:*
+            Resource: "*"
+          - Sid: AllowOrganizationsRead
+            Effect: Allow
+            Action:
+            - organizations:Describe*
+            - organizations:List*
+            Resource: "*"
+          - Sid: AllowBackupPoliciesCreation
+            Effect: Allow
+            Action:
+            - organizations:CreatePolicy
+            Resource: "*"
+            Condition:
+              StringEquals:
+                organizations:PolicyType: BACKUP_POLICY
+          - Sid: AllowBackupPoliciesModification
+            Effect: Allow
+            Action:
+            - organizations:DescribePolicy
+            - organizations:UpdatePolicy
+            - organizations:DeletePolicy
+            - organizations:TagResource
+            - organizations:UntagResource
+            Resource:
+            - !Sub "arn:aws:organizations::${OrgMgmtAcctId}:policy/*/backup_policy/*"
+            Condition:
+              StringEquals:
+                organizations:PolicyType: BACKUP_POLICY
+          - Sid: AllowBackupPoliciesAttachmentAndDetachmentToAllAccountsAndOUs
+            Effect: Allow
+            Action:
+            - organizations:AttachPolicy
+            - organizations:DetachPolicy
+            Resource:
+            - !Sub "arn:aws:organizations::${OrgMgmtAcctId}:root/*"
+            - !Sub "arn:aws:organizations::${OrgMgmtAcctId}:ou/*"
+            - !Sub "arn:aws:organizations::${OrgMgmtAcctId}:account/*"
+            - !Sub "arn:aws:organizations::${OrgMgmtAcctId}:policy/*/backup_policy/*"
+            Condition:
+              StringEquals:
+                organizations:PolicyType: BACKUP_POLICY
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:PutObjectAcl
+            - s3:GetObjectVersion
+            - s3:GetBucketAcl
+            - s3:GetBucketLocation
+            - s3:ListBucket
+            - s3:DeleteObject
+            Resource:
+            - !GetAtt DeploymentBucket.Arn
+            - Fn::Sub:
+              - "${bucketarn}/*"
+              - bucketarn: !GetAtt DeploymentBucket.Arn
+          - Action:
+            - 'kms:Encrypt'
+            - 'kms:Decrypt'
+            - 'kms:ReEncrypt*'
+            - 'kms:GenerateDataKey*'
+            - 'kms:DescribeKey'
+            Resource: !GetAtt CodePipelineKMSKey.Arn
+            Effect: Allow
+
+Outputs:
+  DeploymentBucketName:
+    Value: !Ref DeploymentBucket
+    Description: "S3 deployment bucket name for deployment support of packages and resources"
+    Export:
+      Name: "aws-backup-s3-bucket-name"
+
+  DeploymentBucketArn:
+    Value: !GetAtt DeploymentBucket.Arn
+    Description: "S3 deployment bucket ARN for deployment support of of packages and resources"
+    Export:
+      Name: "aws-backup-s3-bucket-arn"

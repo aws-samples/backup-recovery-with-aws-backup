@@ -1,0 +1,235 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  This template creates the IAM service role used by AWS Backup. It should be deployed to each AWS Organizations member account. #magic___^_^___line
+Parameters:
+  pCrossAccountBackupRoleName:
+    Type: String
+    Description: This is the IAM role name for the cross-account backup role that carries out the backup activities.
+    Default: AWSBackupSolutionRole
+  pRecorderCreationLambdaRoleName:
+    Type: String
+    Description: This is the IAM role name for lambda that creates a config recorder.
+    Default: AWSRecorderCreationLambdaRole
+  pConfigServiceRoleCreationLambdaRoleName:
+    Type: String
+    Description: This is the IAM role name for lambda that creates a service-linked role - AWSServiceRoleForConfig
+    Default: AWSConfigServiceRoleCreationLambdaRole
+  DeployConfigurationRecorder:
+    Description: 'Do you want to configure a Configuration Recorders for each region you use?'
+    Type: String
+
+  # Parameters for tagging
+  CommitId:
+    Description: The commit id for the change
+    Type: String
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+    - Marketing
+    - Engineering
+    - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default: Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default: '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+    - Development
+    - QA
+    - Production
+    ConstraintDescription: Must be a valid environment.
+    Default: Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default: selfserviceservicecatalog@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default: Example Application
+
+Conditions:
+  DeployConfigurationRecorderCondition: !Equals [!Ref DeployConfigurationRecorder, "true"]
+
+Resources:
+  rOrgAccountBackupRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Ref pCrossAccountBackupRoleName
+      Description: Allows AWS Backup to access AWS services
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - backup.amazonaws.com
+          Action:
+          - "sts:AssumeRole"
+      Path: /
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
+      - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+
+
+  rRecorderCreationLambdaRole:
+    Condition: DeployConfigurationRecorderCondition
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref pRecorderCreationLambdaRoleName
+      Description: Role for lambda that creates a config recorder
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: CustomPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - config:PutConfigurationRecorder
+            - config:DescribeConfigurationRecorders
+            - config:StartConfigurationRecorder
+            - config:DescribeConfigurationRecorderStatus
+            - config:PutDeliveryChannel
+            - iam:PassRole
+            Resource: "*"
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+
+  rConfigServiceRoleCreationLambdaRole:
+    Condition: DeployConfigurationRecorderCondition
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref pConfigServiceRoleCreationLambdaRoleName
+      Description: Role for lambda that creates a service-linked role - AWSServiceRoleForConfig
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: LambdaExecutionPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - iam:GetRole
+            - iam:CreateServiceLinkedRole
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+      Tags:
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+
+
+  rCreateConfigRoleFunction:
+    Condition: DeployConfigurationRecorderCondition
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt rConfigServiceRoleCreationLambdaRole.Arn
+      Runtime: python3.12
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+
+          iam = boto3.client('iam')
+
+          def handler(event, context):
+              print('## EVENT')
+              print(event)
+              request_type = event['RequestType']
+              role_name = "AWSServiceRoleForConfig"
+
+              try:
+                  if request_type in ['Create', 'Update']:
+                      # Check if the role exists
+                      try:
+                          iam.get_role(RoleName=role_name)
+                          print(f"Role {role_name} already exists.")
+                      except iam.exceptions.NoSuchEntityException:
+                          # Create the service-linked role
+                          print(f"Creating service-linked role {role_name}.")
+                          iam.create_service_linked_role(
+                              AWSServiceName='config.amazonaws.com'
+                          )
+                  elif request_type == 'Delete':
+                      print("No action required on delete.")
+
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {})
+
+  # Custom resource to invoke the Lambda function
+  rConfigRoleCustomResource:
+    Condition: DeployConfigurationRecorderCondition
+    Type: Custom::CreateConfigRole
+    Properties:
+      ServiceToken: !GetAtt rCreateConfigRoleFunction.Arn
+      ServiceTimeoutServiceTimeout: 300
+
+Outputs:
+  oOrgAccountBackupRoleName:
+    Value: !Ref pCrossAccountBackupRoleName
+

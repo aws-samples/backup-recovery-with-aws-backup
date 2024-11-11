@@ -1,0 +1,277 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create AWS Backup Audit Manager reports
+
+Parameters:
+  OrganizationUnits:
+    Description: A comma separated list of the Organization Units(eg ou-xxxxx-xxxxxxx)
+    Type: AWS::SSM::Parameter::Value<List<String>>
+    Default: "/backup/target/organizational-units"
+
+  DeployResourceComplianceReportPlan:
+    Description: 'Do you want to create a Resource Compliance Report Plan?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/backupplan1"
+
+  DeployControlComplianceReportPlan:
+    Description: 'Do you want to create a Control Compliance Report Plan?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/backupplan2"
+
+  DeployBackupJobReportPlan:
+    Description: 'Do you want to create a Backup Job Report Plan?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/backupplan3"
+
+  DeployCopyJobReportPlan:
+    Description: 'Do you want to create a Copy Job Report Plan?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/backupplan4"
+
+  DeployRestoreJobReportPlan:
+    Description: 'Do you want to create a Restore Job Report Plan?'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: "/backup/backupplan5"
+
+  # Parameters for tagging
+  CommitId:
+    Description: The commit id for the change
+    Type: String
+  BusinessUnit:
+    Description: Business Unit Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    AllowedValues:
+      - Marketing
+      - Engineering
+      - R&D
+    ConstraintDescription: Must be a valid business unit
+    Default: Engineering
+  CostCenter:
+    Description: Cost Center for AWS Services
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Default: '00000'
+  Environment:
+    Description: Environment
+    Type: String
+    AllowedValues:
+      - Development
+      - QA
+      - Production
+    ConstraintDescription: Must be a valid environment.
+    Default: Development
+  ApplicationOwner:
+    Description: Email address of application owner
+    Type: String
+    Default: selfserviceservicecatalog@example.com
+  Application:
+    Description: Application Name
+    Type: String
+    Default: Example Application
+
+Conditions:
+  ResourceComplianceReportPlanCondition: !Equals [!Ref DeployResourceComplianceReportPlan, "true"]
+  ControlComplianceReportPlanCondition: !Equals [!Ref DeployControlComplianceReportPlan, "true"]
+  BackupJobReportPlanCondition: !Equals [!Ref DeployBackupJobReportPlan, "true"]
+  CopyJobReportPlanCondition: !Equals [!Ref DeployCopyJobReportPlan, "true"]
+  RestoreJobReportPlanCondition: !Equals [!Ref DeployRestoreJobReportPlan, "true"]
+
+Resources:
+  rReportBucket:
+    DeletionPolicy: Retain
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+      Tags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  rReportBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn:
+    - rReportBucket
+    Properties:
+      Bucket: !Ref rReportBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            AWS: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/reports.backup.amazonaws.com/AWSServiceRoleForBackupReports"
+          Action: "s3:PutObject"
+          Resource:
+          - !Sub "arn:${AWS::Partition}:s3:::${rReportBucket}/*"
+          Condition:
+            StringEquals:
+              s3:x-amz-acl: "bucket-owner-full-control"
+
+  ResourceComplianceReportPlan:
+    Type: "AWS::Backup::ReportPlan"
+    Condition: ResourceComplianceReportPlanCondition
+    DependsOn:
+    - rReportBucket
+    Properties:
+      ReportPlanDescription: "Resource compliance report helps you track the compliance status of your resources. These reports include detailed evaluation results, including identifying information on non-compliant resources that you can use to identify and correct those resources."
+      ReportDeliveryChannel:
+        Formats:
+        - "CSV"
+        S3BucketName: !Ref rReportBucket
+        S3KeyPrefix: ResourceCompliance
+      ReportSetting:
+        ReportTemplate: RESOURCE_COMPLIANCE_REPORT
+        Regions:
+        - "*"
+        OrganizationUnits: !Ref OrganizationUnits
+      ReportPlanTags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  ControlComplianceReportPlan:
+    Type: "AWS::Backup::ReportPlan"
+    Condition: ControlComplianceReportPlanCondition
+    DependsOn:
+    - rReportBucket
+    Properties:
+      ReportPlanDescription: "Control compliance report helps you track the compliance status of the controls."
+      ReportDeliveryChannel:
+        Formats:
+        - "CSV"
+        S3BucketName: !Ref rReportBucket
+        S3KeyPrefix: ControlCompliance
+      ReportSetting:
+        ReportTemplate: CONTROL_COMPLIANCE_REPORT
+        Regions:
+        - "*"
+        OrganizationUnits: !Ref OrganizationUnits
+      ReportPlanTags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  BackupJobReportPlan:
+    Type: "AWS::Backup::ReportPlan"
+    Condition: BackupJobReportPlanCondition
+    DependsOn:
+    - rReportBucket
+    Properties:
+      ReportPlanDescription: "Daily updates on your backup jobs."
+      ReportDeliveryChannel:
+        Formats:
+        - "CSV"
+        S3BucketName: !Ref rReportBucket
+        S3KeyPrefix: BackupJob
+      ReportSetting:
+        ReportTemplate: BACKUP_JOB_REPORT
+        Regions:
+        - "*"
+        OrganizationUnits: !Ref OrganizationUnits
+      ReportPlanTags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  CopyJobReportPlan:
+    Type: "AWS::Backup::ReportPlan"
+    Condition: CopyJobReportPlanCondition
+    DependsOn:
+    - rReportBucket
+    Properties:
+      ReportPlanDescription: "Daily updates on your copy jobs."
+      ReportDeliveryChannel:
+        Formats:
+        - "CSV"
+        S3BucketName: !Ref rReportBucket
+        S3KeyPrefix: CopyJob
+      ReportSetting:
+        ReportTemplate: COPY_JOB_REPORT
+        Regions:
+        - "*"
+        OrganizationUnits: !Ref OrganizationUnits
+      ReportPlanTags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  RestoreJobReportPlan:
+    Type: "AWS::Backup::ReportPlan"
+    Condition: RestoreJobReportPlanCondition
+    DependsOn:
+    - rReportBucket
+    Properties:
+      ReportPlanDescription: "Daily updates on your restore jobs."
+      ReportDeliveryChannel:
+        Formats:
+        - "CSV"
+        S3BucketName: !Ref rReportBucket
+        S3KeyPrefix: RestoreJob
+      ReportSetting:
+        ReportTemplate: RESTORE_JOB_REPORT
+        Regions:
+        - "*"
+        OrganizationUnits: !Ref OrganizationUnits
+      ReportPlanTags:
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
