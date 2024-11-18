@@ -90,6 +90,9 @@ Resources:
             Action:
               - "sts:AssumeRole"
       Path: /
+      # IMPORTANT - UPDATE PERMISSIONS TO ALIGN TO YOUR RESTORE TESTING
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
       Policies:
         - PolicyName: "RestoreTestingPolicy"
           PolicyDocument:
