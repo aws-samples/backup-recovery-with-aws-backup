@@ -39,9 +39,9 @@ Parameters:
     MinLength: '1'
     MaxLength: '255'
     AllowedValues:
-      - Marketing
-      - Engineering
-      - R&D
+    - Marketing
+    - Engineering
+    - R&D
     ConstraintDescription: Must be a valid business unit
     Default: Engineering
   CostCenter:
@@ -54,9 +54,9 @@ Parameters:
     Description: Environment
     Type: String
     AllowedValues:
-      - Development
-      - QA
-      - Production
+    - Development
+    - QA
+    - Production
     ConstraintDescription: Must be a valid environment.
     Default: Development
   ApplicationOwner:
@@ -75,39 +75,39 @@ Resources:
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
-        - Key: Name
-          Value: backup-recovery-with-aws-backup-demo-vpc
-        - Key: Application
-          Value: !Ref Application
-        - Key: CommitId
-          Value: !Ref CommitId
-        - Key: BusinessUnit
-          Value: !Ref BusinessUnit
-        - Key: CostCenter
-          Value: !Ref CostCenter
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ApplicationOwner
-          Value: !Ref ApplicationOwner
+      - Key: Name
+        Value: backup-recovery-with-aws-backup-demo-vpc
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
-        - Key: Name
-          Value: backup-recovery-with-aws-backup-demo-igw
-        - Key: Application
-          Value: !Ref Application
-        - Key: CommitId
-          Value: !Ref CommitId
-        - Key: BusinessUnit
-          Value: !Ref BusinessUnit
-        - Key: CostCenter
-          Value: !Ref CostCenter
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ApplicationOwner
-          Value: !Ref ApplicationOwner
+      - Key: Name
+        Value: backup-recovery-with-aws-backup-demo-igw
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
 
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -119,45 +119,44 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs ""]
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]
       CidrBlock: !Ref SubnetCidrBlock
       #      MapPublicIpOnLaunch: true
       Tags:
-        - Key: Name
-          Value: backup-recovery-with-aws-backup-demo-subnet
-        - Key: Application
-          Value: !Ref Application
-        - Key: CommitId
-          Value: !Ref CommitId
-        - Key: BusinessUnit
-          Value: !Ref BusinessUnit
-        - Key: CostCenter
-          Value: !Ref CostCenter
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ApplicationOwner
-          Value: !Ref ApplicationOwner
+      - Key: Name
+        Value: backup-recovery-with-aws-backup-demo-subnet
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
-        - Key: Name
-          Value: backup-recovery-with-aws-backup-demo-route-table
-        - Key: Application
-          Value: !Ref Application
-        - Key: CommitId
-          Value: !Ref CommitId
-        - Key: BusinessUnit
-          Value: !Ref BusinessUnit
-        - Key: CostCenter
-          Value: !Ref CostCenter
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ApplicationOwner
-          Value: !Ref ApplicationOwner
-
+      - Key: Name
+        Value: backup-recovery-with-aws-backup-demo-route-table
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
 
   DefaultPublicRoute:
     Type: AWS::EC2::Route
@@ -169,13 +168,12 @@ Resources:
 
   PublicSubnet1RouteTableAssociation:
     DependsOn:
-      - PublicRouteTable
-      - PublicSubnet1
+    - PublicRouteTable
+    - PublicSubnet1
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet1
-
 
   ServersLaunchTemplateDB:
     Type: AWS::EC2::LaunchTemplate
@@ -184,44 +182,44 @@ Resources:
       LaunchTemplateData:
         ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}"
         BlockDeviceMappings:
-          - DeviceName: /dev/xvda
-            Ebs:
-              VolumeSize: '8'
-              VolumeType: gp2
-              Encrypted: true
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: '8'
+            VolumeType: gp2
+            Encrypted: true
+            KmsKeyId: alias/AWSBackupSolutionKey
         InstanceType: !Ref EC2InstanceType
         IamInstanceProfile:
           Name: !Ref AWSBackupDemoInstanceProfile
         NetworkInterfaces:
-          - AssociatePublicIpAddress: true
-            SubnetId: !Ref PublicSubnet1
-            DeviceIndex: "0"
-            Groups:
-              - !Ref InstanceSG
+        - AssociatePublicIpAddress: true
+          SubnetId: !Ref PublicSubnet1
+          DeviceIndex: "0"
+          Groups:
+          - !Ref InstanceSG
         UserData:
           Fn::Base64: !Sub |
             #!/usr/bin/env bash
             yum install -y amazon-cloudwatch-agent
         TagSpecifications:
-          - ResourceType: instance
-            Tags:
-              - Key: Name
-                Value: backup-recovery-with-aws-backup-demo-ec2-db
-              - Key: !Ref TagKey
-                Value: !Ref TagValue
-              - Key: Application
-                Value: !Ref Application
-              - Key: CommitId
-                Value: !Ref CommitId
-              - Key: BusinessUnit
-                Value: !Ref BusinessUnit
-              - Key: CostCenter
-                Value: !Ref CostCenter
-              - Key: Environment
-                Value: !Ref Environment
-              - Key: ApplicationOwner
-                Value: !Ref ApplicationOwner
-
+        - ResourceType: instance
+          Tags:
+          - Key: Name
+            Value: backup-recovery-with-aws-backup-demo-ec2-db
+          - Key: !Ref TagKey
+            Value: !Ref TagValue
+          - Key: Application
+            Value: !Ref Application
+          - Key: CommitId
+            Value: !Ref CommitId
+          - Key: BusinessUnit
+            Value: !Ref BusinessUnit
+          - Key: CostCenter
+            Value: !Ref CostCenter
+          - Key: Environment
+            Value: !Ref Environment
+          - Key: ApplicationOwner
+            Value: !Ref ApplicationOwner
 
   ServersLaunchTemplateWebServer:
     Type: AWS::EC2::LaunchTemplate
@@ -230,44 +228,44 @@ Resources:
       LaunchTemplateData:
         ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}"
         BlockDeviceMappings:
-          - DeviceName: /dev/xvda
-            Ebs:
-              VolumeSize: '8'
-              VolumeType: gp2
-              Encrypted: true
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: '8'
+            VolumeType: gp2
+            Encrypted: true
+            KmsKeyId: alias/AWSBackupSolutionKey
         InstanceType: !Ref EC2InstanceType
         IamInstanceProfile:
           Name: !Ref AWSBackupDemoInstanceProfile
         NetworkInterfaces:
-          - AssociatePublicIpAddress: true
-            SubnetId: !Ref PublicSubnet1
-            DeviceIndex: "0"
-            Groups:
-              - !Ref InstanceSG
+        - AssociatePublicIpAddress: true
+          SubnetId: !Ref PublicSubnet1
+          DeviceIndex: "0"
+          Groups:
+          - !Ref InstanceSG
         UserData:
           Fn::Base64: !Sub |
             #!/usr/bin/env bash
             yum install -y amazon-cloudwatch-agent
         TagSpecifications:
-          - ResourceType: instance
-            Tags:
-              - Key: Name
-                Value: backup-recovery-with-aws-backup-demo-ec2-web
-              - Key: !Ref TagKey
-                Value: !Ref TagValue
-              - Key: Application
-                Value: !Ref Application
-              - Key: CommitId
-                Value: !Ref CommitId
-              - Key: BusinessUnit
-                Value: !Ref BusinessUnit
-              - Key: CostCenter
-                Value: !Ref CostCenter
-              - Key: Environment
-                Value: !Ref Environment
-              - Key: ApplicationOwner
-                Value: !Ref ApplicationOwner
-
+        - ResourceType: instance
+          Tags:
+          - Key: Name
+            Value: backup-recovery-with-aws-backup-demo-ec2-web
+          - Key: !Ref TagKey
+            Value: !Ref TagValue
+          - Key: Application
+            Value: !Ref Application
+          - Key: CommitId
+            Value: !Ref CommitId
+          - Key: BusinessUnit
+            Value: !Ref BusinessUnit
+          - Key: CostCenter
+            Value: !Ref CostCenter
+          - Key: Environment
+            Value: !Ref Environment
+          - Key: ApplicationOwner
+            Value: !Ref ApplicationOwner
 
   ServersLaunchTemplateAppServer:
     Type: AWS::EC2::LaunchTemplate
@@ -276,154 +274,63 @@ Resources:
       LaunchTemplateData:
         ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}"
         BlockDeviceMappings:
-          - DeviceName: /dev/xvda
-            Ebs:
-              VolumeSize: '8'
-              VolumeType: gp2
-              Encrypted: true
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: '8'
+            VolumeType: gp2
+            Encrypted: true
+            KmsKeyId: alias/AWSBackupSolutionKey
         InstanceType: !Ref EC2InstanceType
         IamInstanceProfile:
           Name: !Ref AWSBackupDemoInstanceProfile
         NetworkInterfaces:
-          - AssociatePublicIpAddress: true
-            SubnetId: !Ref PublicSubnet1
-            DeviceIndex: "0"
-            Groups:
-              - !Ref InstanceSG
+        - AssociatePublicIpAddress: true
+          SubnetId: !Ref PublicSubnet1
+          DeviceIndex: "0"
+          Groups:
+          - !Ref InstanceSG
         UserData:
           Fn::Base64: !Sub |
             #!/usr/bin/env bash
             yum install -y amazon-cloudwatch-agent
         TagSpecifications:
-          - ResourceType: instance
-            Tags:
-              - Key: Name
-                Value: backup-recovery-with-aws-backup-demo-ec2-app
-              - Key: !Ref TagKey
-                Value: !Ref TagValue
-              - Key: Application
-                Value: !Ref Application
-              - Key: CommitId
-                Value: !Ref CommitId
-              - Key: BusinessUnit
-                Value: !Ref BusinessUnit
-              - Key: CostCenter
-                Value: !Ref CostCenter
-              - Key: Environment
-                Value: !Ref Environment
-              - Key: ApplicationOwner
-                Value: !Ref ApplicationOwner
-
+        - ResourceType: instance
+          Tags:
+          - Key: Name
+            Value: backup-recovery-with-aws-backup-demo-ec2-app
+          - Key: !Ref TagKey
+            Value: !Ref TagValue
+          - Key: Application
+            Value: !Ref Application
+          - Key: CommitId
+            Value: !Ref CommitId
+          - Key: BusinessUnit
+            Value: !Ref BusinessUnit
+          - Key: CostCenter
+            Value: !Ref CostCenter
+          - Key: Environment
+            Value: !Ref Environment
+          - Key: ApplicationOwner
+            Value: !Ref ApplicationOwner
 
   SampleServersFleetDB:
     DependsOn: AWSBackupDemoInstanceProfile
     Type: AWS::EC2::EC2Fleet
     Properties:
       LaunchTemplateConfigs:
-        - LaunchTemplateSpecification:
-            LaunchTemplateId: !Ref ServersLaunchTemplateDB
-            Version: !GetAtt ServersLaunchTemplateDB.LatestVersionNumber
+      - LaunchTemplateSpecification:
+          LaunchTemplateId: !Ref ServersLaunchTemplateDB
+          Version: !GetAtt ServersLaunchTemplateDB.LatestVersionNumber
       Type: instant
       TargetCapacitySpecification:
         DefaultTargetCapacityType: on-demand
         OnDemandTargetCapacity: !Ref DBServerCount
         TotalTargetCapacity: !Ref DBServerCount
       TagSpecifications:
-        - ResourceType: fleet
-          Tags:
-            - Key: Name
-              Value: backup-recovery-with-aws-backup-demo-fleet-db
-            - Key: !Ref TagKey
-              Value: !Ref TagValue
-            - Key: Application
-              Value: !Ref Application
-            - Key: CommitId
-              Value: !Ref CommitId
-            - Key: BusinessUnit
-              Value: !Ref BusinessUnit
-            - Key: CostCenter
-              Value: !Ref CostCenter
-            - Key: Environment
-              Value: !Ref Environment
-            - Key: ApplicationOwner
-              Value: !Ref ApplicationOwner
-
-
-
-  SampleServersFleetAppServers:
-    DependsOn: AWSBackupDemoInstanceProfile
-    Type: AWS::EC2::EC2Fleet
-    Properties:
-      LaunchTemplateConfigs:
-        - LaunchTemplateSpecification:
-            LaunchTemplateId: !Ref ServersLaunchTemplateAppServer
-            Version: !GetAtt ServersLaunchTemplateAppServer.LatestVersionNumber
-      Type: instant
-      TargetCapacitySpecification:
-        DefaultTargetCapacityType: on-demand
-        OnDemandTargetCapacity: !Ref AppServerCount
-        TotalTargetCapacity: !Ref AppServerCount
-      TagSpecifications:
-        - ResourceType: fleet
-          Tags:
-            - Key: Name
-              Value: backup-recovery-with-aws-backup-demo-fleet-app
-            - Key: !Ref TagKey
-              Value: !Ref TagValue
-            - Key: Application
-              Value: !Ref Application
-            - Key: CommitId
-              Value: !Ref CommitId
-            - Key: BusinessUnit
-              Value: !Ref BusinessUnit
-            - Key: CostCenter
-              Value: !Ref CostCenter
-            - Key: Environment
-              Value: !Ref Environment
-            - Key: ApplicationOwner
-              Value: !Ref ApplicationOwner
-
-
-  SampleServersFleetWebServers:
-    DependsOn: AWSBackupDemoInstanceProfile
-    Type: AWS::EC2::EC2Fleet
-    Properties:
-      LaunchTemplateConfigs:
-        - LaunchTemplateSpecification:
-            LaunchTemplateId: !Ref ServersLaunchTemplateWebServer
-            Version: !GetAtt ServersLaunchTemplateWebServer.LatestVersionNumber
-      Type: instant
-      TargetCapacitySpecification:
-        DefaultTargetCapacityType: on-demand
-        OnDemandTargetCapacity: !Ref WebServerCount
-        TotalTargetCapacity: !Ref WebServerCount
-      TagSpecifications:
-        - ResourceType: fleet
-          Tags:
-            - Key: Name
-              Value: backup-recovery-with-aws-backup-demo-fleet-web
-            - Key: !Ref TagKey
-              Value: !Ref TagValue
-            - Key: Application
-              Value: !Ref Application
-            - Key: CommitId
-              Value: !Ref CommitId
-            - Key: BusinessUnit
-              Value: !Ref BusinessUnit
-            - Key: CostCenter
-              Value: !Ref CostCenter
-            - Key: Environment
-              Value: !Ref Environment
-            - Key: ApplicationOwner
-              Value: !Ref ApplicationOwner
-
-
-  InstanceSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: AWS Backup Demo Resources Security Group
-      VpcId: !Ref VPC
-      Tags:
+      - ResourceType: fleet
+        Tags:
+        - Key: Name
+          Value: backup-recovery-with-aws-backup-demo-fleet-db
         - Key: !Ref TagKey
           Value: !Ref TagValue
         - Key: Application
@@ -439,6 +346,93 @@ Resources:
         - Key: ApplicationOwner
           Value: !Ref ApplicationOwner
 
+  SampleServersFleetAppServers:
+    DependsOn: AWSBackupDemoInstanceProfile
+    Type: AWS::EC2::EC2Fleet
+    Properties:
+      LaunchTemplateConfigs:
+      - LaunchTemplateSpecification:
+          LaunchTemplateId: !Ref ServersLaunchTemplateAppServer
+          Version: !GetAtt ServersLaunchTemplateAppServer.LatestVersionNumber
+      Type: instant
+      TargetCapacitySpecification:
+        DefaultTargetCapacityType: on-demand
+        OnDemandTargetCapacity: !Ref AppServerCount
+        TotalTargetCapacity: !Ref AppServerCount
+      TagSpecifications:
+      - ResourceType: fleet
+        Tags:
+        - Key: Name
+          Value: backup-recovery-with-aws-backup-demo-fleet-app
+        - Key: !Ref TagKey
+          Value: !Ref TagValue
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  SampleServersFleetWebServers:
+    DependsOn: AWSBackupDemoInstanceProfile
+    Type: AWS::EC2::EC2Fleet
+    Properties:
+      LaunchTemplateConfigs:
+      - LaunchTemplateSpecification:
+          LaunchTemplateId: !Ref ServersLaunchTemplateWebServer
+          Version: !GetAtt ServersLaunchTemplateWebServer.LatestVersionNumber
+      Type: instant
+      TargetCapacitySpecification:
+        DefaultTargetCapacityType: on-demand
+        OnDemandTargetCapacity: !Ref WebServerCount
+        TotalTargetCapacity: !Ref WebServerCount
+      TagSpecifications:
+      - ResourceType: fleet
+        Tags:
+        - Key: Name
+          Value: backup-recovery-with-aws-backup-demo-fleet-web
+        - Key: !Ref TagKey
+          Value: !Ref TagValue
+        - Key: Application
+          Value: !Ref Application
+        - Key: CommitId
+          Value: !Ref CommitId
+        - Key: BusinessUnit
+          Value: !Ref BusinessUnit
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ApplicationOwner
+          Value: !Ref ApplicationOwner
+
+  InstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: AWS Backup Demo Resources Security Group
+      VpcId: !Ref VPC
+      Tags:
+      - Key: !Ref TagKey
+        Value: !Ref TagValue
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+
   OutboundAll:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
@@ -453,20 +447,20 @@ Resources:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ec2.amazonaws.com
-            Action:
-              - sts:AssumeRole
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
       Path: "/"
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
 
   AWSBackupDemoInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Path: "/"
       Roles:
-        - !Ref AWSBackupDemoInstanceRole
+      - !Ref AWSBackupDemoInstanceRole

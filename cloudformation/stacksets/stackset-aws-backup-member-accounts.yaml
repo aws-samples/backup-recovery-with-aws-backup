@@ -35,6 +35,10 @@ Parameters:
     Type: AWS::SSM::Parameter::Value<String>
     Description: This is the account number for the account that is used to house centralized backups from member accounts
     Default: "/backup/central-vault-arn"
+  CentralAccountId:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: The AWS Account ID for the central account that will be the secondary store for all AWS Backups.  Secondary copies and restore testing will be in this account.
+    Default: "/backup/central-account-id"
 
   # Parameters for tagging
   CommitId:
@@ -75,7 +79,6 @@ Parameters:
     Type: String
     Default: Example Application
 
-
 Resources:
   StackSetDeployment:
     Type: AWS::CloudFormation::StackSet
@@ -111,6 +114,8 @@ Resources:
         ParameterValue: !Ref CommitId
       - ParameterKey: CentralBackupVaultArn
         ParameterValue: !Ref CentralBackupVaultArn
+      - ParameterKey: CentralAccountId
+        ParameterValue: !Ref CentralAccountId
       - ParameterKey: Application
         ParameterValue: !Ref Application
       - ParameterKey: BusinessUnit
@@ -135,4 +140,3 @@ Resources:
         Value: !Ref Environment
       - Key: ApplicationOwner
         Value: !Ref ApplicationOwner
-

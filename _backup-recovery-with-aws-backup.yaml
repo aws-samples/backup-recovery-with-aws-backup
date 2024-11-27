@@ -67,6 +67,7 @@ Metadata:
     - Label:
         default: "AWS Backup Report Configuration"
       Parameters:
+      - DeployReportFeature
       - DeployResourceComplianceReportPlan
       - DeployControlComplianceReportPlan
       - DeployBackupJobReportPlan
@@ -171,6 +172,8 @@ Metadata:
       DeployControl10:
         default: "Control #10-Restore time for resources meet target"
 
+      DeployReportFeature:
+        default: "Backup Audit Manager Report Feature"
       DeployResourceComplianceReportPlan:
         default: "Report Plan #1-RESOURCE_COMPLIANCE_REPORT"
       DeployControlComplianceReportPlan:
@@ -391,36 +394,43 @@ Parameters:
     - no
     Default: no
 
+  DeployReportFeature:
+    Description: 'Do you want to deploy Report resources?'
+    Type: String
+    AllowedValues:
+    - yes
+    - no
+    Default: yes
   DeployResourceComplianceReportPlan:
-    Description: 'Do you want to create a Resource Compliance Report Plan?'
+    Description: 'Do you want to create a Resource Compliance Report Plan? This parameter is only used if the value of "Backup Audit Manager Report Feature" is set to true.'
     Type: String
     AllowedValues:
     - yes
     - no
     Default: yes
   DeployControlComplianceReportPlan:
-    Description: 'Do you want to create a Control Compliance Report Plan?'
+    Description: 'Do you want to create a Control Compliance Report Plan? This parameter is only used if the value of "Backup Audit Manager Report Feature" is set to true.'
     Type: String
     AllowedValues:
     - yes
     - no
     Default: yes
   DeployBackupJobReportPlan:
-    Description: 'Do you want to create a Backup Job Report Plan?'
+    Description: 'Do you want to create a Backup Job Report Plan? This parameter is only used if the value of "Backup Audit Manager Report Feature" is set to true.'
     Type: String
     AllowedValues:
     - yes
     - no
     Default: yes
   DeployCopyJobReportPlan:
-    Description: 'Do you want to create a Copy Job Report Plan?'
+    Description: 'Do you want to create a Copy Job Report Plan? This parameter is only used if the value of "Backup Audit Manager Report Feature" is set to true.'
     Type: String
     AllowedValues:
     - yes
     - no
     Default: yes
   DeployRestoreJobReportPlan:
-    Description: 'Do you want to create a Restore Job Report Plan?'
+    Description: 'Do you want to create a Restore Job Report Plan? This parameter is only used if the value of "Backup Audit Manager Report Feature" is set to true.'
     Type: String
     AllowedValues:
     - yes
@@ -432,7 +442,10 @@ Parameters:
     AllowedValues:
     - yes
     - no
-    Default: yes
+    Default: no
+
+Conditions:
+  DeployReportFeatureCondition: !Equals [ !Ref DeployReportFeature, "true" ]
 
 Resources:
   AWSBackupOrgId:
@@ -462,7 +475,6 @@ Resources:
         CostCenter: !Ref CostCenter
         Environment: !Ref Environment
         ApplicationOwner: !Ref ApplicationOwner
-
 
   AWSBackupSolutionOrgUnit:
     Type: AWS::SSM::Parameter
@@ -533,7 +545,6 @@ Resources:
         CostCenter: !Ref CostCenter
         Environment: !Ref Environment
         ApplicationOwner: !Ref ApplicationOwner
-
 
   RestoreTestScheduleParameter:
     Type: AWS::SSM::Parameter
@@ -646,7 +657,6 @@ Resources:
         CostCenter: !Ref CostCenter
         Environment: !Ref Environment
         ApplicationOwner: !Ref ApplicationOwner
-
 
   AWSBackupTargetGlobalRegion:
     Type: AWS::SSM::Parameter
@@ -901,6 +911,7 @@ Resources:
         ApplicationOwner: !Ref ApplicationOwner
 
   ResourceComplianceReportPlan:
+    Condition: DeployReportFeatureCondition
     Type: AWS::SSM::Parameter
     Properties:
       Description: "Do you want to create a Resource Compliance Report Plan?"
@@ -915,6 +926,7 @@ Resources:
         ApplicationOwner: !Ref ApplicationOwner
 
   ControlComplianceReportPlan:
+    Condition: DeployReportFeatureCondition
     Type: AWS::SSM::Parameter
     Properties:
       Description: "Do you want to create a Control Compliance Report Plan?"
@@ -929,6 +941,7 @@ Resources:
         ApplicationOwner: !Ref ApplicationOwner
 
   BackupJobReportPlan:
+    Condition: DeployReportFeatureCondition
     Type: AWS::SSM::Parameter
     Properties:
       Description: "Do you want to create a Backup Job Report Plan?"
@@ -943,6 +956,7 @@ Resources:
         ApplicationOwner: !Ref ApplicationOwner
 
   CopyJobReportPlan:
+    Condition: DeployReportFeatureCondition
     Type: AWS::SSM::Parameter
     Properties:
       Description: "Do you want to create a Copy Job Report Plan?"
@@ -957,6 +971,7 @@ Resources:
         ApplicationOwner: !Ref ApplicationOwner
 
   RestoreJobReportPlan:
+    Condition: DeployReportFeatureCondition
     Type: AWS::SSM::Parameter
     Properties:
       Description: "Do you want to create a Restore Job Report Plan?"
@@ -983,7 +998,6 @@ Resources:
         CostCenter: !Ref CostCenter
         Environment: !Ref Environment
         ApplicationOwner: !Ref ApplicationOwner
-
 
   DeploymentBucket:
     Type: "AWS::S3::Bucket"
@@ -1021,7 +1035,7 @@ Resources:
           Resource:
           - !Join
             - ''
-            - - Fn::GetAtt: [DeploymentBucket, Arn]
+            - - Fn::GetAtt: [ DeploymentBucket, Arn ]
               - '/*'
           Condition:
             Bool:
@@ -1033,7 +1047,7 @@ Resources:
           Resource:
           - !Join
             - ''
-            - - Fn::GetAtt: [DeploymentBucket, Arn]
+            - - Fn::GetAtt: [ DeploymentBucket, Arn ]
               - '/*'
           Condition:
             StringEqualsIgnoreCaseIfExists:
@@ -1061,13 +1075,12 @@ Resources:
           Resource:
           - !Join
             - ''
-            - - Fn::GetAtt: [DeploymentBucket, Arn]
+            - - Fn::GetAtt: [ DeploymentBucket, Arn ]
               - '/*'
           Condition:
             ForAnyValue:StringLike:
               aws:PrincipalOrgPaths:
               - !Sub "${OrgId}/*"
-
 
   # --- Pipeline Assets
   # KMS Key for CodePipeline
@@ -1106,7 +1119,6 @@ Resources:
       AliasName: !Sub "alias/aws-backup-codepipeline-kms"
       TargetKeyId: !Ref CodePipelineKMSKey
 
-
   # Pipeline definition
   ProductPipeline:
     DependsOn:
@@ -1122,8 +1134,8 @@ Resources:
     Properties:
       Name: backup-recovery-aws-backup
       DisableInboundStageTransitions:
-        - StageName: DeployBackupOrgPolicy
-          Reason: "Update the aws-backup-org-policy.yaml file with the central vault ARN before org policy deployment"
+      - StageName: DeployBackupOrgPolicy
+        Reason: "Update the aws-backup-org-policy.yaml file with the central vault ARN before org policy deployment"
       ArtifactStore:
         Type: S3
         Location: !Ref DeploymentBucket
@@ -1325,33 +1337,13 @@ Resources:
                 "CommitId": "#{SourceVariables.CommitId}"
               }
           RunOrder: 1
-      - Name: DeployReportPlan
-        Actions:
-        - InputArtifacts:
-          - Name: SourceArtifacts
-          Name: Deploy_ReportPlan
-          ActionTypeId:
-            Category: Deploy
-            Owner: AWS
-            Version: '1'
-            Provider: CloudFormation
-          Configuration:
-            ActionMode: REPLACE_ON_FAILURE
-            StackName: aws-backup-report-plan
-            RoleArn: !GetAtt CloudFormationRole.Arn
-            Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
-            TemplatePath: SourceArtifacts::cloudformation/stacks/aws-backup-report-plan.yaml
-            ParameterOverrides: |
-              {
-                "CommitId": "#{SourceVariables.CommitId}"
-              }
-
-          RunOrder: 1
-      - Name: DeployDemoResources
-        Actions:
+      - !If
+        - DeployReportFeatureCondition
+        - Name: DeployReportPlan
+          Actions:
           - InputArtifacts:
-              - Name: SourceArtifacts
-            Name: Deploy_DemoResources
+            - Name: SourceArtifacts
+            Name: Deploy_ReportPlan
             ActionTypeId:
               Category: Deploy
               Owner: AWS
@@ -1359,17 +1351,39 @@ Resources:
               Provider: CloudFormation
             Configuration:
               ActionMode: REPLACE_ON_FAILURE
-              StackName: stackset-aws-backup-demo-resources
+              StackName: aws-backup-report-plan
               RoleArn: !GetAtt CloudFormationRole.Arn
               Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
-              TemplatePath: SourceArtifacts::cloudformation/stacksets/stackset-aws-backup-demo-resources.yaml
+              TemplatePath: SourceArtifacts::cloudformation/stacks/aws-backup-report-plan.yaml
               ParameterOverrides: |
                 {
                   "CommitId": "#{SourceVariables.CommitId}"
                 }
+
             RunOrder: 1
+        - !Ref "AWS::NoValue"
 
-
+      - Name: DeployDemoResources
+        Actions:
+        - InputArtifacts:
+          - Name: SourceArtifacts
+          Name: Deploy_DemoResources
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Version: '1'
+            Provider: CloudFormation
+          Configuration:
+            ActionMode: REPLACE_ON_FAILURE
+            StackName: stackset-aws-backup-demo-resources
+            RoleArn: !GetAtt CloudFormationRole.Arn
+            Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+            TemplatePath: SourceArtifacts::cloudformation/stacksets/stackset-aws-backup-demo-resources.yaml
+            ParameterOverrides: |
+              {
+                "CommitId": "#{SourceVariables.CommitId}"
+              }
+          RunOrder: 1
 
   CodePipelineManageStepsRole:
     Type: AWS::IAM::Role
@@ -1465,7 +1479,6 @@ Resources:
       - Key: ApplicationOwner
         Value: !Ref ApplicationOwner
 
-
   CodeBuildValidateTemplates:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -1554,7 +1567,6 @@ Resources:
         Value: !Ref Environment
       - Key: ApplicationOwner
         Value: !Ref ApplicationOwner
-
 
   CloudFormationRole:
     Type: AWS::IAM::Role

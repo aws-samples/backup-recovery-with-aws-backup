@@ -11,9 +11,9 @@ Parameters:
     MinLength: '1'
     MaxLength: '255'
     AllowedValues:
-      - Marketing
-      - Engineering
-      - R&D
+    - Marketing
+    - Engineering
+    - R&D
     Default: Engineering
   CostCenter:
     Description: Cost Center for AWS Services.
@@ -25,9 +25,9 @@ Parameters:
     Description: Environment.
     Type: String
     AllowedValues:
-      - Development
-      - QA
-      - Production
+    - Development
+    - QA
+    - Production
     Default: Development
   ApplicationOwner:
     Description: Email address of the application owner.
@@ -38,8 +38,6 @@ Parameters:
     Type: String
     Default: Backup and Recovery with AWS Backup
 
-
-
 Resources:
   # IAM Role for the Lambda function
   AWSBackupRestoreTestValidationLambdaExecutionRole:
@@ -48,38 +46,38 @@ Resources:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Effect: "Allow"
-            Principal:
-              Service:
-                - "lambda.amazonaws.com"
-            Action:
-              - "sts:AssumeRole"
+        - Effect: "Allow"
+          Principal:
+            Service:
+            - "lambda.amazonaws.com"
+          Action:
+          - "sts:AssumeRole"
       Policies:
-        - PolicyName: "LambdaExecutionPolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: "Allow"
-                Action:
-                  - "logs:CreateLogGroup"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
-                  - "ec2:DescribeInstanceStatus"
-                  - "backup:PutRestoreValidationResult"
-                Resource: "*"
+      - PolicyName: "LambdaExecutionPolicy"
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: "Allow"
+            Action:
+            - "logs:CreateLogGroup"
+            - "logs:CreateLogStream"
+            - "logs:PutLogEvents"
+            - "ec2:DescribeInstanceStatus"
+            - "backup:PutRestoreValidationResult"
+            Resource: "*"
       Tags:
-        - Key: Application
-          Value: !Ref Application
-        - Key: CommitId
-          Value: !Ref CommitId
-        - Key: BusinessUnit
-          Value: !Ref BusinessUnit
-        - Key: CostCenter
-          Value: !Ref CostCenter
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ApplicationOwner
-          Value: !Ref ApplicationOwner
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
 
   # Lambda Function Definition
   RestoreTestingValidationLambda:
@@ -93,10 +91,10 @@ Resources:
         ZipFile: |
           const { EC2 } = require('@aws-sdk/client-ec2');
           const { Backup } = require('@aws-sdk/client-backup');
-          
+
           exports.handler = async (event) => {
             console.log("Handling event: ", event);
-          
+
             const restoreTestingPlanArn = event.detail.restoreTestingPlanArn;
             const resourceType = event.detail.resourceType;
             const createdResourceArn = event.detail.createdResourceArn;
@@ -149,18 +147,29 @@ Resources:
           }
       Timeout: 120
       Tags:
-        - Key: Application
-          Value: !Ref Application
-        - Key: CommitId
-          Value: !Ref CommitId
-        - Key: BusinessUnit
-          Value: !Ref BusinessUnit
-        - Key: CostCenter
-          Value: !Ref CostCenter
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ApplicationOwner
-          Value: !Ref ApplicationOwner
+      - Key: Application
+        Value: !Ref Application
+      - Key: CommitId
+        Value: !Ref CommitId
+      - Key: BusinessUnit
+        Value: !Ref BusinessUnit
+      - Key: CostCenter
+        Value: !Ref CostCenter
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: ApplicationOwner
+        Value: !Ref ApplicationOwner
+
+  LambdaInvokePermission:
+    DependsOn:
+    - BackupRestoreJobStateChangeRule
+    - RestoreTestingValidationLambda
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt RestoreTestingValidationLambda.Arn
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt BackupRestoreJobStateChangeRule.Arn
 
   # EventBridge Rule for Backup Restore Job State Change
   BackupRestoreJobStateChangeRule:
@@ -168,17 +177,14 @@ Resources:
     Properties:
       EventPattern:
         source:
-          - "aws.backup"
+        - "aws.backup"
         detail-type:
-          - "Restore Job State Change"
+        - "Restore Job State Change"
         detail:
           resourceType:
-            - "EC2"
-          restoreTestingPlanArn:
-            - !ImportValue RestoreTestingPlanArn  # Import the ARN from the first template
+          - "EC2"
           status:
-            - "COMPLETED"
+          - "COMPLETED"
       Targets:
-        - Arn: !GetAtt RestoreTestingValidationLambda.Arn
-          Id: "RestoreTestingValidationFunction"
-
+      - Arn: !GetAtt RestoreTestingValidationLambda.Arn
+        Id: "RestoreTestingValidationFunction"

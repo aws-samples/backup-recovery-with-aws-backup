@@ -95,7 +95,7 @@ The [aws-backup-org-resource-policy-delegate-backup-policy-mgmt.yaml](./cloudfor
 
 Deploy this template in your AWS Organizations Management account using the AWS console or run this command using the AWS CLI.  
 
-If you prefer, you can use the AWS CLI to deploy the policy in the AWS Organizations management account.  Make sure your permissions are set to your AWS Organizations management account before using this CLI command:
+Make sure your permissions are set to your AWS Organizations management account before using this CLI command:
 
       aws cloudformation create-stack \
           --stack-name "aws-backup-org-resource-policy-delegate-backup-policy-mgmt"  \
@@ -182,11 +182,12 @@ Before you can deploy the solution, you will need to take note of the following 
 ---
 
 #### AWS Backup Report Configuration
-* **Report Plan #1 - RESOURCE_COMPLIANCE_REPORT**: Create a Resource Compliance Report Plan. (default: `true`)
-* **Report Plan #2 - CONTROL_COMPLIANCE_REPORT**: Create a Control Compliance Report Plan. (default: `true`)
-* **Report Plan #3 - BACKUP_JOB_REPORT**: Create a Backup Job Report Plan. (default: `true`)
-* **Report Plan #4 - COPY_JOB_REPORT**: Create a Copy Job Report Plan. (default: `true`)
-* **Report Plan #5 - RESTORE_JOB_REPORT**: Create a Restore Job Report Plan. (default: `true`)
+* **Backup Audit Manager Report Feature** - Deploy Report Resources below. (default: `true`)
+* **Report Plan #1 - RESOURCE_COMPLIANCE_REPORT**: Create a Resource Compliance Report Plan. This is only used if the value of "Backup Audit Manager Report Feature" is set to true. (default: `true`)
+* **Report Plan #2 - CONTROL_COMPLIANCE_REPORT**: Create a Control Compliance Report Plan. This is only used if the value of "Backup Audit Manager Report Feature" is set to true. (default: `true`)
+* **Report Plan #3 - BACKUP_JOB_REPORT**: Create a Backup Job Report Plan. This is only used if the value of "Backup Audit Manager Report Feature" is set to true. (default: `true`)
+* **Report Plan #4 - COPY_JOB_REPORT**: Create a Copy Job Report Plan. This is only used if the value of "Backup Audit Manager Report Feature" is set to true. (default: `true`)
+* **Report Plan #5 - RESTORE_JOB_REPORT**: Create a Restore Job Report Plan. This is only used if the value of "Backup Audit Manager Report Feature" is set to true. (default: `true`)
 
 ---
 
@@ -200,15 +201,17 @@ Before you can deploy the solution, you will need to take note of the following 
 ---
 
 #### AWS Config Configuration Recorder
-* **Auto-configuration of AWS Config Configuration Recorder**: Automatically configure a Configuration Recorder for each region. (default: `true`)
+* **Auto-configuration of AWS Config Configuration Recorder**: Automatically configure a Configuration Recorder for each region. (default: `false`)
+> ⚠️ **Warning:** If you want to deploy the recorder with Cloudformation(means you select true), please make sure there is no recorder in each region. Otherwise, an error will occur when deploying the template. 
 
---- 
+> **Info:** If you select false, you can use AWS Systems Manager Quick Setup to create a configuration recorder across multiple organizational units (OUs) and AWS Regions using AWS best practices. For more information, see [Create an AWS Config configuration recorder using Quick Setup](https://docs.aws.amazon.com/systems-manager/latest/userguide/quick-setup-config.html) in the Systems Manager User Guide.
+---  
 
 
 # Deployment
 The solution utilizes AWS CodePipeline for orchestration and deployment of AWS resources to your selected AWS organizational unit (OU) accounts.  
 
-The default source code configuration in CodePipeline utilizes GitHub.  If you wish to use another source code provider then you can update the CodePipeline **SourcStage** in [_backup-recovery-with-aws-backup.yaml](_backup-recovery-with-aws-backup.yaml) CloudFormation template appropriately.
+The default source code configuration in CodePipeline utilizes GitHub.  If you wish to use another source code provider then you can update the CodePipeline **SourceStage** in [_backup-recovery-with-aws-backup.yaml](_backup-recovery-with-aws-backup.yaml) CloudFormation template appropriately.
 
 ## GitHub Setup
 

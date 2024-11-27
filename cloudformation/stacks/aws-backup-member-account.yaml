@@ -5,6 +5,9 @@ Parameters:
   CentralBackupVaultArn:
     Description: The ARN of a centralized AWS Backup Vault that will be the secondary store for all AWS Backups.  The defined organization backup policy plans will "copy_to" this vault.
     Type: String
+  CentralAccountId:
+    Description: The ARN of a centralized AWS Backup Vault that will be the secondary store for all AWS Backups.  The defined organization backup policy plans will "copy_to" this vault.
+    Type: String
   pCrossAccountBackupRoleName:
     Type: String
     Description: This is the IAM role name for the cross-account backup role that carries out the backup activities.
@@ -107,6 +110,34 @@ Resources:
             StringEquals:
               "kms:CallerAccount": !Sub ${AWS::AccountId}
               "kms:ViaService": !Sub "cloudformation.${AWS::Region}.amazonaws.com"
+        - Sid: Allow use of the key
+          Effect: "Allow"
+          Principal:
+            AWS:
+            - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+            - !Sub "arn:${AWS::Partition}:iam::${CentralAccountId}:root"
+          Action:
+          - kms:DescribeKey
+          - kms:Encrypt
+          - kms:Decrypt
+          - kms:ReEncrypt*
+          - kms:GenerateDataKey
+          - kms:GenerateDataKeyWithoutPlaintext
+          Resource: "*"
+        - Sid: Allow attachment of persistent resources
+          Effect: "Allow"
+          Principal:
+            AWS:
+            - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+            - !Sub "arn:${AWS::Partition}:iam::${CentralAccountId}:root"
+          Action:
+          - kms:CreateGrant
+          - kms:ListGrants
+          - kms:RevokeGrant
+          Resource: "*"
+          Condition:
+            Bool:
+              "kms:GrantIsForAWSResource": "true"
       Tags:
       - Key: Application
         Value: !Ref Application
@@ -146,4 +177,3 @@ Outputs:
     Value: !Ref rMemberAccountBackupKey
   oOrgAccountBackupRole:
     Value: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${pCrossAccountBackupRoleName}
-

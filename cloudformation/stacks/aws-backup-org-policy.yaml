@@ -1,11 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform:
 - 'AWS::LanguageExtensions'
-Description: This template deploys AWS Organization Backup Policies to manage backups at an organization level. It should be deployed in the AWS Organizations management account or from an AWS Account with delegated Administrator permissions.
+Description: This template deploys AWS Organization Backup Policies to manage
+  backups at an organization level. It should be deployed in the AWS
+  Organizations management account or from an AWS Account with delegated
+  Administrator permissions.
 
 Parameters:
   pOrgBackupTargetOUs:
-    Description: A comma separated list of the AWS Organizations OUs to attach backup policies.
+    Description: A comma separated list of the AWS Organizations OUs to attach
+      backup policies.
     Type: AWS::SSM::Parameter::Value<CommaDelimitedList>
     Default: "/backup/target/organizational-units"
   pRegions:
@@ -13,19 +17,24 @@ Parameters:
     Type: AWS::SSM::Parameter::Value<CommaDelimitedList>
     Default: "/backup/target/regions"
   pCentralBackupVaultArn:
-    Description: The ARN of a centralized AWS Backup Vault that will be the secondary store for all AWS Backups.  The defined organization backup policy plans will "copy_to" this vault.
+    Description: The ARN of a centralized AWS Backup Vault that will be the
+      secondary store for all AWS Backups.  The defined organization backup
+      policy plans will "copy_to" this vault.
     Type: AWS::SSM::Parameter::Value<String>
     Default: "/backup/central-vault-arn"
   pCrossAccountBackupRole:
-    Description: This is the IAM role name for the cross-account backup role that carries out the backup activities.
+    Description: This is the IAM role name for the cross-account backup role that
+      carries out the backup activities.
     Type: String
     Default: AWSBackupSolutionRole
   DailyBackupSchedule:
-    Description: The CRON job to initiate backup jobs. For example, cron(0 5 ? * * *) for daily, every day at 05:00 UTC.
+    Description: The CRON job to initiate backup jobs. For example, cron(0 5 ? * *
+      *) for daily, every day at 05:00 UTC.
     Type: String
     Default: cron(0 5 ? * * *)
   MonthlyBackupSchedule:
-    Description: The CRON job to initiate backup jobs. For example, cron(0 5 1 * ? *) for monthly, first day of month at midnight UTC.
+    Description: The CRON job to initiate backup jobs. For example, cron(0 5 1 * ?
+      *) for monthly, first day of month at midnight UTC.
     Type: String
     Default: cron(0 5 1 * ? *)
   pMemberAccountBackupVault:
@@ -35,19 +44,23 @@ Parameters:
     Default: AWSBackupSolutionVault
   pBackupTagKey1:
     Type: String
-    Description: The backup tag key to automatically assign resources to a backup plan across the member accounts.
+    Description: The backup tag key to automatically assign resources to a backup
+      plan across the member accounts.
     Default: 'backup'
   pBackupTagValue1:
     Type: String
-    Description: The backup tag value to automatically assign resources to a backup plan across the member accounts.
+    Description: The backup tag value to automatically assign resources to a backup
+      plan across the member accounts.
     Default: 'daily'
   pBackupTagKey2:
     Type: String
-    Description: The backup tag key to automatically assign resources to a backup plan across the member accounts.
+    Description: The backup tag key to automatically assign resources to a backup
+      plan across the member accounts.
     Default: 'backup'
   pBackupTagValue2:
     Type: String
-    Description: The backup tag value to automatically assign resources to a backup plan across the member accounts.
+    Description: The backup tag value to automatically assign resources to a backup
+      plan across the member accounts.
     Default: 'monthly'
   pTagKey:
     Type: String
@@ -169,7 +182,6 @@ Resources:
       - Key: ApplicationOwner
         Value: !Ref ApplicationOwner
 
-
   rOrgMonthlyBackUpPolicy:
     Type: AWS::Organizations::Policy
     Properties:
@@ -240,4 +252,3 @@ Resources:
         Value: !Ref Environment
       - Key: ApplicationOwner
         Value: !Ref ApplicationOwner
-
